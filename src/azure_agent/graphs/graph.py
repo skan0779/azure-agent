@@ -31,6 +31,8 @@ from langgraph.graph import StateGraph, START, END
 
 from schemas.state import AgentState
 
+from azure_agent.middlewares.stream import event_stream_before_agent, event_stream_before_model
+
 from tools.azure_ai_search import create_azure_ai_search_tool
 
 from edges.router_edge import router_conditional_edge
@@ -314,6 +316,10 @@ class LangGraphProcess:
                 PIIMiddleware("ip", strategy="redact"),
                 PIIMiddleware("mac_address", strategy="redact"),
                 PIIMiddleware("url", strategy="redact"),
+
+                # Custom Middleware
+                event_stream_before_agent,
+                event_stream_before_model,
             ],
             state_schema=AgentState,
             name="main_agent",
