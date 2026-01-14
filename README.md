@@ -4,9 +4,17 @@
 
 ---
 
-## 2. Quick Start
 
-### 2.1 Setup (uv)
+## Project Structure
+
+
+
+---
+
+
+## Quick Start
+
+### Setup (uv)
 > Use `uv` for dependency management.
 ```bash
 # Install uv
@@ -16,20 +24,36 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv sync
 ```
 
-### 2.2 Run Locally
-> Start the FastAPI application
+### Environment (required)
+> `KEY_VAULT_URL` is required; secrets are pulled from Azure Key Vault.
+> Check `environments/env/README.md` for the secret value list.
 ```bash
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+export KEY_VAULT_URL="<your-azure-key-vault-url>"
 ```
 
-### 2.3 Run with Docker
+### Run Locally (optional)
+> Start the FastAPI application (match the container module path).
+```bash
+PYTHONPATH=src/azure_agent uv run uvicorn api.main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+### Run with Docker (optional)
 > Build and run using the deployment compose file.
 ```bash
 docker compose -f environments/deploy/docker-compose.yml up --build
 ```
 
-### 2.4 Swagger API
-> Swagger UI assets are bundled in `app/static` (load in air‑gapped environment)
+
+---
+
+
+## API Endpoints
+- `GET /agent/api/ping`
+- `POST /agent/api/user_query/stream` (SSE stream)
+- `POST /agent/api/delete_thread`
+
+## Swagger UI
+> Swagger UI assets are bundled in `src/azure_agent/api/static` (air-gapped).
 ```bash
-http://<host>:8001/agent/swagger
+http://<your-azure-container-host>:8001/agent/swagger
 ```

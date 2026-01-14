@@ -1,13 +1,12 @@
 from typing import TypedDict, Annotated, Literal
 
 from utils.message import add_messages_capped
+from langgraph.graph.message import add_messages
 
 
 class AgentState(TypedDict, total=False):
     """
-    Base Schema for Agent State that performs:
-        - store information within StateGraph
-        - store conversation messages with Message capping
+    Base Schema for StateGraph
 
     Args:
         messages (list): List of messages in the conversation
@@ -18,7 +17,8 @@ class AgentState(TypedDict, total=False):
         guardrail (bool): Guardrail check
     """
     # Messages
-    messages: Annotated[list, add_messages_capped]
+    messages: Annotated[list, add_messages]
+    # messages: Annotated[list, add_messages_capped]
 
     # Basic Inputs
     thread_id: Annotated[str, "Thread ID"]

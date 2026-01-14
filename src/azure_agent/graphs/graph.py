@@ -16,6 +16,15 @@ from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
+from langchain.agents.middleware import (
+    ModelCallLimitMiddleware,
+    ModelFallbackMiddleware,
+    ModelRetryMiddleware,
+    ToolCallLimitMiddleware,
+    ToolRetryMiddleware,
+    PIIMiddleware,
+    SummarizationMiddleware,
+)
 
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.graph import StateGraph, START, END
@@ -97,6 +106,7 @@ class LangGraphProcess:
             api_key=self.AZURE_OPENAI_API_KEY,
             api_version=self.AZURE_OPENAI_API_VERSION,
             azure_deployment=self.AZURE_OPENAI_MAIN_MODEL,
+            tiktoken_model_name=self.AZURE_OPENAI_MAIN_MODEL,
             model=self.AZURE_OPENAI_MAIN_MODEL,
             stream_usage=True,
         )
@@ -107,6 +117,7 @@ class LangGraphProcess:
             api_key=self.AZURE_OPENAI_API_KEY,
             api_version=self.AZURE_OPENAI_API_VERSION,
             azure_deployment=self.AZURE_OPENAI_SMALL_MODEL,
+            tiktoken_model_name=self.AZURE_OPENAI_SMALL_MODEL,
             model=self.AZURE_OPENAI_SMALL_MODEL,
             stream_usage=False,
         )
@@ -279,7 +290,31 @@ class LangGraphProcess:
             model=self.main_model,
             tools=[azure_ai_search_tool],
             system_prompt=self._load_prompt("main_agent_prompt.yaml"),
-            middleware=[],
+            middleware=[
+                # Model Middleware
+                ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
+                ModelRetryMiddleware(max_retries=2),
+                ModelFallbackMiddleware(models=self.small_model),
+
+                # Tool Middleware
+                ToolCallLimitMiddleware(tool_name="azure_ai_search_tool", run_limit=2, exit_behavior="continue"),
+                ToolRetryMiddleware(max_retries=2),
+
+                # Message Middleware
+                SummarizationMiddleware(
+                    model=self.small_model, 
+                    trigger=[("tokens", 10000)],
+                    keep=[("messages", 20)],
+                    token_counter=self.small_model.get_num_tokens_from_messages,
+                ),
+
+                # PII Middleware
+                PIIMiddleware("email", strategy="mask"),
+                PIIMiddleware("credit_card", strategy="mask"),
+                PIIMiddleware("ip", strategy="redact"),
+                PIIMiddleware("mac_address", strategy="redact"),
+                PIIMiddleware("url", strategy="redact"),
+            ],
             state_schema=AgentState,
             name="main_agent",
         )
