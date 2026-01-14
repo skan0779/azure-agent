@@ -1,4 +1,4 @@
-# Azure Agent
+# <img src="docs/icons/azure.svg" alt="Azure" height="28" /> Azure Agent
 > Production-ready AI Agent Template optimized for Azure Cloud
 
 
