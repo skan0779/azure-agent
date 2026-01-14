@@ -1,0 +1,93 @@
+[project]
+name = "azure-agent"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain-openai",
+    "azure-storage-blob",
+    "pillow",
+    "pydantic",
+    "openai",
+    "python-dotenv",
+    "fastapi",
+    "uvicorn",
+    "gradio",
+    "langchain>=1.2.2",
+    "langchain-core>=1.2.6",
+    "azure-search-documents",
+    "azure-core",
+    "typing-extensions",
+    "redis",
+    "aiohttp",
+    "langgraph-checkpoint-redis>=0.1.1",
+    "langchain-community>=0.3.29",
+    "openpyxl>=3.1.5",
+    "gunicorn>=23.0.0",
+    "httpx>=0.28.1",
+    "python-multipart>=0.0.20",
+    "tabulate>=0.9.0",
+    "xlrd>=2.0.2",
+    "azure-keyvault>=4.2.0",
+    "azure-identity>=1.25.1",
+    "pyyaml>=6.0.2",
+    "langgraph>=1.0.5",
+    "python-toon>=0.1.3",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.black]
+line-length = 88
+target-version = ['py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+line_length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"
+
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+    "flake8>=7.3.0",
+    "ipython>=9.5.0",
+    "isort>=6.0.1",
+    "mypy>=1.17.1",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.1.0",
+    "pytest-cov>=7.0.0",
+]
