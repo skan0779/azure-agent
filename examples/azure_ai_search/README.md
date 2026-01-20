@@ -1,5 +1,12 @@
-# <img src="/docs/icons/Azure-AI-Search.svg" height="28" /> Azure AI Search (examples)
-> Example code for create and upload index in Azure AI Search from Local PC
+<p align="center">
+  <img src="docs/icons/Azure-AI-Search.svg" height="72" alt="Azure AI Search" />
+</p>
+
+<h1 align="center">Azure AI Search (examples)</h1>
+
+<p align="center">
+  Example code to create and upload an index in Azure AI Search from a local PC
+</p>
 
 ---
 
