@@ -23,7 +23,6 @@ def create_guardrail_node(
     Create a node that performs:
         - Token Limit Check
         - Personal Information Identification Check
-    
     Messages:
         token_limit_message
         pii_message
@@ -76,88 +75,90 @@ def create_guardrail_node(
             msg = token_limit_message(total_tokens, TOKEN_LIMIT, NODE)
             return {"guardrail": True, "messages": [AIMessage(content=msg)]}
         
-        # Personal Information Identification Handling
-        try:
-            # Single-chunk Processing
-            if total_tokens <= PII_CHUNK:
+        # # Personal Information Identification Handling
+        # try:
+        #     # Single-chunk Processing
+        #     if total_tokens <= PII_CHUNK:
                 
-                # Event Streaming
-                writer({"type": "event", "content": "checking PII..."})
+        #         # Event Streaming
+        #         writer({"type": "event", "content": "checking PII..."})
 
-                # HTTP Request
-                async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0)) as client:
-                    resp = await client.post(PII_HOST + "/api/pii", json={"text": user_query})
+        #         # HTTP Request
+        #         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0)) as client:
+        #             resp = await client.post(PII_HOST + "/api/pii", json={"text": user_query})
                 
-                resp.raise_for_status()
-                data = resp.json()
-                blocked: bool = bool(data.get("blocked", False))
-                label_list = data.get("label_list", []) or []
-                masked_user_query: str = data.get("masked_text", user_query)
+        #         resp.raise_for_status()
+        #         data = resp.json()
+        #         blocked: bool = bool(data.get("blocked", False))
+        #         label_list = data.get("label_list", []) or []
+        #         masked_user_query: str = data.get("masked_text", user_query)
                 
-                # PII Detected
-                if blocked:
+        #         # PII Detected
+        #         if blocked:
                     
-                    # Update State Message
-                    _mask_message(state, masked_user_query)
+        #             # Update State Message
+        #             _mask_message(state, masked_user_query)
 
-                    # Create Message
-                    msg = pii_message(labels=label_list, node=NODE)
+        #             # Create Message
+        #             msg = pii_message(labels=label_list, node=NODE)
                     
-                    return {"guardrail": True, "user_query": masked_user_query, "messages": [AIMessage(content=msg)]}
-                else:
-                    return {"guardrail": False}
+        #             return {"guardrail": True, "user_query": masked_user_query, "messages": [AIMessage(content=msg)]}
+        #         else:
+        #             return {"guardrail": False}
 
-            # Multi-chunk Processing
-            else:
-                masked_chunks = []
-                async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0)) as client:
-                    for i in range(0, total_tokens, PII_CHUNK):
+        #     # Multi-chunk Processing
+        #     else:
+        #         masked_chunks = []
+        #         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=2.0)) as client:
+        #             for i in range(0, total_tokens, PII_CHUNK):
                         
-                        # Event Streaming
-                        writer({"type": "event", "content": f"checking PII ({i//PII_CHUNK + 1}/{(total_tokens-1)//PII_CHUNK + 1})..."})
+        #                 # Event Streaming
+        #                 writer({"type": "event", "content": f"checking PII ({i//PII_CHUNK + 1}/{(total_tokens-1)//PII_CHUNK + 1})..."})
 
-                        # Chunk Processing
-                        chunk_tokens = tokens[i:i + PII_CHUNK]
-                        chunk_text = encoding.decode(chunk_tokens)
+        #                 # Chunk Processing
+        #                 chunk_tokens = tokens[i:i + PII_CHUNK]
+        #                 chunk_text = encoding.decode(chunk_tokens)
 
-                        # HTTP Request
-                        resp = await client.post(PII_HOST + "/api/pii", json={"text": chunk_text})
-                        resp.raise_for_status()
-                        data = resp.json()
-                        chunk_blocked = bool(data.get("blocked", False))
-                        chunk_labels = data.get("label_list", []) or []
-                        chunk_masked = data.get("masked_text", chunk_text)
-                        masked_chunks.append(chunk_masked)
+        #                 # HTTP Request
+        #                 resp = await client.post(PII_HOST + "/api/pii", json={"text": chunk_text})
+        #                 resp.raise_for_status()
+        #                 data = resp.json()
+        #                 chunk_blocked = bool(data.get("blocked", False))
+        #                 chunk_labels = data.get("label_list", []) or []
+        #                 chunk_masked = data.get("masked_text", chunk_text)
+        #                 masked_chunks.append(chunk_masked)
 
-                        # PII Detected in Chunk
-                        if chunk_blocked:
+        #                 # PII Detected in Chunk
+        #                 if chunk_blocked:
 
-                            # Combine Masked Chunks
-                            masked_user_query = "".join(masked_chunks) + "..."
+        #                     # Combine Masked Chunks
+        #                     masked_user_query = "".join(masked_chunks) + "..."
 
-                            # Update State Message
-                            _mask_message(state, masked_user_query)
+        #                     # Update State Message
+        #                     _mask_message(state, masked_user_query)
 
-                            # Create Message
-                            msg = pii_message(labels=chunk_labels, node=NODE)
+        #                     # Create Message
+        #                     msg = pii_message(labels=chunk_labels, node=NODE)
 
-                            return {"guardrail": True, "user_query": masked_user_query, "messages": [AIMessage(content=msg)]}
+        #                     return {"guardrail": True, "user_query": masked_user_query, "messages": [AIMessage(content=msg)]}
                         
-                return {"guardrail": False}
+        #         return {"guardrail": False}
 
-        # HTTP Status Error Handling
-        except httpx.HTTPStatusError as e:
-            msg = pii_error_message(e, NODE)
-            return {"guardrail": True, "messages": [AIMessage(content=msg)]}
+        # # HTTP Status Error Handling
+        # except httpx.HTTPStatusError as e:
+        #     msg = pii_error_message(e, NODE)
+        #     return {"guardrail": True, "messages": [AIMessage(content=msg)]}
 
-        # HTTP Request Error Handling
-        except httpx.RequestError as e:
-            msg = pii_error_message(e, NODE)
-            return {"guardrail": True, "messages": [AIMessage(content=msg)]}
+        # # HTTP Request Error Handling
+        # except httpx.RequestError as e:
+        #     msg = pii_error_message(e, NODE)
+        #     return {"guardrail": True, "messages": [AIMessage(content=msg)]}
         
-        # Other Exception Handling
-        except Exception as e:
-            msg = pii_error_message(e, NODE)          
-            return {"guardrail": True, "messages": [AIMessage(content=msg)]}
+        # # Other Exception Handling
+        # except Exception as e:
+        #     msg = pii_error_message(e, NODE)          
+        #     return {"guardrail": True, "messages": [AIMessage(content=msg)]}
+
+        return {"guardrail": False}
 
     return guardrail_node

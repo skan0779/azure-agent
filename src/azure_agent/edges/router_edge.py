@@ -11,7 +11,7 @@ def router_conditional_edge(state: AgentState) -> str:
     Conditional Edge from "router" node
 
     Returns:
-        str: name of next node ("main_agent", "document_agent", END)
+        str: name of next node ("main_agent", "deep_agent", END)
     """
     # Guardrail Check
     guardrail = state.get("guardrail", False)
@@ -22,9 +22,9 @@ def router_conditional_edge(state: AgentState) -> str:
     # Agent Type Check
     else:
         agent_type = state.get("agent_type", "main_agent")
-        if agent_type == "document_agent":
-            logger.info("[router_conditional_edge] : document_agent")
-            return "document_agent"
+        if agent_type == "deep_agent":
+            logger.info("[router_conditional_edge] : deep_agent")
+            return "deep_agent"
         else:
             logger.info("[router_conditional_edge] : main_agent")
             return "main_agent"

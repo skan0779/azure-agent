@@ -92,9 +92,13 @@ celerybeat.pid
 *.sage.py
 
 # Environments
+.env.dev
 .venv
 venv/
 venv.bak/
+
+# Examples
+# examples/
 
 # Spyder project settings
 .spyderproject

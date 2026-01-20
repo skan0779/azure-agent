@@ -1,7 +1,4 @@
-import os
-import yaml
-import logging
-import inspect
+import os, yaml, logging, inspect
 from pathlib import Path
 
 from azure.core.credentials import AzureKeyCredential
@@ -22,16 +19,25 @@ from langchain.agents.middleware import (
     ModelRetryMiddleware,
     ToolCallLimitMiddleware,
     ToolRetryMiddleware,
+    # HumanInTheLoopMiddleware,
     PIIMiddleware,
     SummarizationMiddleware,
+    TodoListMiddleware,
 )
 
+from deepagents.middleware import FilesystemMiddleware, SubAgentMiddleware
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+
+from langchain_tavily import TavilySearch
+
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
+from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
 from langgraph.graph import StateGraph, START, END
 
 from schemas.state import AgentState
 
-from azure_agent.middlewares.stream import event_stream_before_agent, event_stream_before_model
+from middlewares.stream import event_stream_before_agent, event_stream_before_model
+from middlewares.state import update_state_after_agent
 
 from tools.azure_ai_search import create_azure_ai_search_tool
 
@@ -50,7 +56,7 @@ class LangGraphProcess:
         """
         Initalize Application Configuration and dependencies that Performs:
             Load Azure Key Vault Client
-            Load Azure Key Vault Secrets (Azure OpenAI, Storage Account, Managed Redis)
+            Load Azure Key Vault Secrets (Azure OpenAI, Storage Account, Managed Redis, Postgres, PII, TikToken)
             Create Azure OpenAI Models (Main, Small, Embedding)     
             Create Azure AI Search Client
         """
@@ -82,11 +88,11 @@ class LangGraphProcess:
         self.AZURE_AI_SEARCH_TOP_K = secret_client.get_secret("AZURE-AI-SEARCH-TOP-K").value
         
         # Blob Storage
-        self.BLOB_NAME = secret_client.get_secret("BLOB-PROMPTS").value
+        self.BLOB_CONTAINER_NAME = secret_client.get_secret("BLOB-CONTAINER-NAME").value
         self.BLOB_CONNECTION_STRING = secret_client.get_secret("BLOB-CONNECTION-STRING").value
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
             conn_str=self.BLOB_CONNECTION_STRING,
-            container_name=self.BLOB_NAME,
+            container_name=self.BLOB_CONTAINER_NAME,
         )
 
         # Redis
@@ -95,8 +101,14 @@ class LangGraphProcess:
         self.REDIS_PORT = secret_client.get_secret("REDIS-PORT").value
         self.REDIS_DB = secret_client.get_secret("REDIS-DB").value
 
+        # Postgres
+        self.POSTGRES_CONN_STRING = secret_client.get_secret("POSTGRES-CONN-STRING").value
+
+        # Tavily Search
+        os.environ["TAVILY_API_KEY"] = secret_client.get_secret("TAVILY-API-KEY").value
+
         # PII
-        self.PII_HOST = secret_client.get_secret("PII-HOST").value
+        # self.PII_HOST = secret_client.get_secret("PII-HOST").value
 
         # TikToken
         self.TIKTOKEN_ENCODER = secret_client.get_secret("TIKTOKEN-ENCODER").value
@@ -145,7 +157,8 @@ class LangGraphProcess:
         """
         Initalize Application Runtime Resource that Performs:
             Create Redis Client
-            Create Checkpointer
+            Create Checkpointer (Shallow Redis): ttl 1 day
+            Create  Store (Postgres): ttl 30 days
             Compile StateGraph
         """
         # Redis Client
@@ -162,52 +175,131 @@ class LangGraphProcess:
         )
 
         # Checkpointer
-        self.memory = AsyncShallowRedisSaver(redis_client=self.redis_client)
+        self.memory = AsyncShallowRedisSaver(
+            redis_client=self.redis_client,
+            ttl={
+                "default_ttl": 60 * 60 * 24,
+                "refresh_on_read": True,
+            },
+        )
         await getattr(self.memory, "asetup", lambda: None)()
 
+        # Store 
+        self.store = AsyncPostgresStore.from_conn_string(
+            conn_string=self.POSTGRES_CONN_STRING,
+            pool_config=PoolConfig(
+                min_size=1,
+                max_size=5,
+            ),
+            # index={
+            #     "dims": 3072,
+            #     "embed": self.embedding_model,
+            #     "fields": ["text"],
+            # },
+            ttl={
+                "default_ttl": 60 * 24 * 30,
+                "refresh_on_read": True, 
+            },
+        )
+        await self.store.setup()
+
         # Build Graph
-        self.graph = self._build_graph(checkpointer=self.memory)
+        self.graph = self._build_graph(
+            checkpointer=self.memory,
+            store=self.store,
+        )
 
     async def close(self) -> None:
         """
         Cleanup Application Runtime Resources that Performs:
-            Cleanup Checkpinter
-            Cleanup Redis (Client, Connection Pool)
+            - Stop Store Sweeper
+            - Cleanup Store
+            - Cleanup Checkpointer
+            - Cleanup Redis Client, Connection Pool
         """
+        # Cleanup Store
+        store = getattr(self, "store", None)
+        if store is not None:
+            # Stop Sweeper
+            try:
+                stop = getattr(store, "stop_ttl_sweeper", None)
+                if callable(stop):
+                    try:
+                        maybe = stop(timeout=5)
+                        if inspect.isawaitable(maybe):
+                            await maybe
+                    except TypeError:
+                        maybe = stop()
+                        if inspect.isawaitable(maybe):
+                            await maybe
+            except Exception:
+                pass
+
+            # Close Store
+            try:
+                aclose = getattr(store, "aclose", None)
+                close = getattr(store, "close", None)
+                if callable(aclose):
+                    await aclose()
+                elif callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception:
+                pass
+            
+            # Remove Reference
+            self.store = None
+        
         # Cleanup Checkpointer
         memory = getattr(self, "memory", None)
         if memory is not None:
-            aclose = getattr(memory, "aclose", None)
-            close = getattr(memory, "close", None)
-            if callable(aclose):
-                await aclose()
-            elif callable(close):
-                maybe = close()
-                if inspect.isawaitable(maybe):
-                    await maybe
+            try:
+                aclose = getattr(memory, "aclose", None)
+                close = getattr(memory, "close", None)
+                if callable(aclose):
+                    await aclose()
+                elif callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception:
+                pass
+
+            # Remove Reference
+            self.memory = None
 
         # Cleanup Redis Client
         redis_client = getattr(self, "redis_client", None)
         if redis_client is not None:
 
             # Cleanup Redis Client
-            aclose = getattr(redis_client, "aclose", None)
-            close = getattr(redis_client, "close", None)
-            if callable(aclose):
-                await aclose()
-            elif callable(close):
-                maybe = close()
-                if inspect.isawaitable(maybe):
-                    await maybe
-            
-            # Cleanup Redis Connection Pool
-            pool = getattr(redis_client, "connection_pool", None)
-            if pool is not None:
-                disconnect = getattr(pool, "disconnect", None)
-                if callable(disconnect):
-                    maybe = disconnect()
+            try:
+                aclose = getattr(redis_client, "aclose", None)
+                close = getattr(redis_client, "close", None)
+                if callable(aclose):
+                    await aclose()
+                elif callable(close):
+                    maybe = close()
                     if inspect.isawaitable(maybe):
                         await maybe
+            except Exception:
+                pass
+            
+            # Cleanup Redis Connection Pool
+            try:
+                pool = getattr(redis_client, "connection_pool", None)
+                if pool is not None:
+                    disconnect = getattr(pool, "disconnect", None)
+                    if callable(disconnect):
+                        maybe = disconnect()
+                        if inspect.isawaitable(maybe):
+                            await maybe
+            except Exception:
+                pass
+
+            # Remove Reference
+            self.redis_client = None
 
     def _load_prompt(self, file_name: str) -> str:
         """
@@ -239,7 +331,7 @@ class LangGraphProcess:
         data = yaml.safe_load(raw)
         return str(data["system"]).strip()
 
-    def _build_graph(self, checkpointer=None):
+    def _build_graph(self, checkpointer=None, store=None):
         """
         LangGraphProcess StateGraph Compiler that builds:
             State:
@@ -257,6 +349,7 @@ class LangGraphProcess:
         
         Args:
             checkpointer: checkpoint saver Instance
+            store: data store Instance
         Returns:
             StateGraph: LangGraphProcess StateGraph Instance
         """
@@ -271,11 +364,14 @@ class LangGraphProcess:
             top_k=int(self.AZURE_AI_SEARCH_TOP_K),
         )
 
+        # Create Tavily Search Tool
+        tavily_search_tool = TavilySearch(max_results=3, topic="general")
+
         # Create Guardrail Node
         guardrail_node = create_guardrail_node(
             ENCODER=self.TIKTOKEN_ENCODER,
             TOKEN_LIMIT=30000,
-            PII_HOST=self.PII_HOST,
+            # PII_HOST=self.PII_HOST,
             PII_CHUNK=10000,
         )
         builder.add_node("guardrail", guardrail_node)
@@ -290,7 +386,10 @@ class LangGraphProcess:
         # Create Main Agent
         main_agent = create_agent(
             model=self.main_model,
-            tools=[azure_ai_search_tool],
+            tools=[
+                azure_ai_search_tool,
+                tavily_search_tool,
+            ],
             system_prompt=self._load_prompt("main_agent_prompt.yaml"),
             middleware=[
                 # Model Middleware
@@ -301,12 +400,13 @@ class LangGraphProcess:
                 # Tool Middleware
                 ToolCallLimitMiddleware(tool_name="azure_ai_search_tool", run_limit=2, exit_behavior="continue"),
                 ToolRetryMiddleware(max_retries=2),
+                # HumanInTheLoopMiddleware(interrupt_on={"azure_ai_search_tool": {"allowed_decisions": ["approve", "reject"]}}),
 
                 # Message Middleware
                 SummarizationMiddleware(
-                    model=self.small_model, 
+                    model=self.small_model,
                     trigger=[("tokens", 10000)],
-                    keep=[("messages", 20)],
+                    keep=("messages", 10),
                     token_counter=self.small_model.get_num_tokens_from_messages,
                 ),
 
@@ -326,16 +426,69 @@ class LangGraphProcess:
         )
         builder.add_node("main_agent", main_agent)
 
-        # Create Document Agent
-        document_agent = create_agent(
+        # Create Deep Agent
+        deep_agent = create_agent(
             model=self.main_model,
-            tools=[],
-            system_prompt=self._load_prompt("document_agent_prompt.yaml"),
-            middleware=[],
+            system_prompt=self._load_prompt("deep_agent_prompt.yaml"),
+            store=store,
+            middleware=[
+                # Deep Agent Middleware
+                TodoListMiddleware(),
+                FilesystemMiddleware(
+                    backend=lambda runtime: CompositeBackend(
+                        default=StateBackend(runtime),
+                        routes={
+                            "/memories/": StoreBackend(runtime),
+                        },
+                    )
+                ),
+                SubAgentMiddleware(
+                    default_model=self.main_model,
+                    subagents = [
+                        {
+                            "name": "research",
+                            "description": "Research and gather facts. Return concise bullet points and sources if available.",
+                            "system_prompt": self._load_prompt("researcher_prompt.yaml"),
+                            "tools": [tavily_search_tool],
+                            "middleware": [
+                                ToolCallLimitMiddleware(
+                                    tool_name=tavily_search_tool.name,
+                                    run_limit=3,
+                                    exit_behavior="continue",
+                                )
+                            ],
+                        },
+                        {
+                            "name": "writer",
+                            "description": "Write a clean final answer based on provided notes.",
+                            "system_prompt": self._load_prompt("writer_prompt.yaml"),
+                        },
+                    ]
+                ),
+
+                # Model Middleware
+                ModelCallLimitMiddleware(run_limit=10, exit_behavior="end"),
+                ModelRetryMiddleware(max_retries=2),
+
+                # Tool Middleware
+                ToolCallLimitMiddleware(run_limit=20, exit_behavior="continue"),
+                ToolRetryMiddleware(max_retries=2),
+                
+                # Message Middleware
+                SummarizationMiddleware(
+                    model=self.small_model,
+                    trigger=[("tokens", 10000)],
+                    keep=("messages", 20),
+                    token_counter=self.small_model.get_num_tokens_from_messages,
+                ),
+
+                # Custom Middleware
+                update_state_after_agent,
+            ],
             state_schema=AgentState,
-            name="document_agent",
+            name="deep_agent",
         )
-        builder.add_node("document_agent", document_agent)
+        builder.add_node("deep_agent", deep_agent)
 
         # Define Edges and Conditonal Edges
         builder.add_edge(START, "guardrail")
@@ -352,14 +505,15 @@ class LangGraphProcess:
             router_conditional_edge,
             {
                 "main_agent": "main_agent",
-                "document_agent": "document_agent",
+                "deep_agent": "deep_agent",
                 END:END,
             },
         )
         builder.add_edge("main_agent", END)
-        builder.add_edge("document_agent", END)
+        builder.add_edge("deep_agent", END)
 
-        return builder.compile(checkpointer=checkpointer)
+        # Compile Graph
+        return builder.compile(checkpointer=checkpointer, store=store)
 
     async def main(
         self,

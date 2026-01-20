@@ -13,7 +13,7 @@ class AgentState(TypedDict, total=False):
         thread_id (str): Thread ID
         user_id (str): User ID
         user_query (str): User Question
-        agent_type (Literal["main_agent", "document_agent"]): Selected agent type
+        agent_type (Literal["main_agent", "deep_agent"]): Selected agent type
         guardrail (bool): Guardrail check
     """
     # Messages
@@ -26,7 +26,7 @@ class AgentState(TypedDict, total=False):
     user_query: Annotated[str, "User Question"]
 
     # Router
-    agent_type: Annotated[Literal["main_agent", "document_agent"], "Selected Agent Type"]
+    agent_type: Annotated[Literal["main_agent", "deep_agent"], "Selected Agent Type"]
     
     # Guardrail
     guardrail: Annotated[bool, "Quardrail Check"]

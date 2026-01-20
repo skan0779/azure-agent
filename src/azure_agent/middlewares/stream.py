@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from langchain.agents.middleware import before_agent, before_model
 
 from langgraph.runtime import Runtime

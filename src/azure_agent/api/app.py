@@ -34,9 +34,18 @@ async def lifespan(app: FastAPI):
 
     # App State Initialization
     app.state.agent = agent
+    logger.info("[app.py] Agent Initialize Success")
 
-    # Logging
-    logger.info("Agent Initialize Success")
+    # TTL sweeper (store)
+    store = getattr(agent, "store", None)
+    if store is not None:
+        start = getattr(store, "start_ttl_sweeper", None)
+        if callable(start):
+            try:
+                await start(sweep_interval_minutes=60)
+                logger.info("[app.py] Success to start Postgres TTL sweeper")
+            except Exception as exc:
+                logger.warning("[app.py] Failed to start Postgres TTL sweeper: %s", exc)
 
     # Yield to application
     try:
@@ -45,11 +54,14 @@ async def lifespan(app: FastAPI):
     # Application Shutdown
     finally:
         agent = getattr(app.state, "agent", None)
+        app.state.agent = None
+
         if agent is not None:
             try:
                 await agent.close()
             except Exception as exc:
                 logger.warning("[app.py] Application Cleanup Failed: %s", exc)
+
         logger.info("[app.py] Application shutdown")
 
 
