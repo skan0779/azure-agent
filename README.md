@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icons/Azure-A.svg" height="72" alt="Azure" />
+  <img src="/docs/icons/Azure-A.svg" height="72" alt="Azure" />
 </p>
 
 <h1 align="center">Azure Agent</h1>

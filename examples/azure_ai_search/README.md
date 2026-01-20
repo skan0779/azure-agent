@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/icons/Azure-AI-Search.svg" height="72" alt="Azure AI Search" />
+  <img src="/docs/icons/Azure-AI-Search.svg" height="72" alt="Azure AI Search" />
 </p>
 
 <h1 align="center">Azure AI Search (examples)</h1>
