@@ -35,6 +35,7 @@ dependencies = [
     "deepagents>=0.3.5",
     "langgraph-checkpoint-postgres>=3.0.3",
     "langchain-tavily>=0.2.16",
+    "psycopg[binary]>=3.3.2",
 ]
 
 [tool.setuptools]

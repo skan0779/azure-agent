@@ -40,7 +40,7 @@ export KEY_VAULT_URL="<your-azure-key-vault-url>"
 ### Run Locally (optional)
 > Start the FastAPI application (match the container module path).
 ```bash
-PYTHONPATH=src/azure_agent uv run uvicorn api.main:app --host 0.0.0.0 --port 8001 --reload
+PYTHONPATH=src/azure_agent uv run uvicorn api.main:app --host 0.0.0.0 --port 8080 --reload
 ```
 
 ### Run with Docker (optional)

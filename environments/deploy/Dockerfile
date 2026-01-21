@@ -29,11 +29,11 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8001
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -fsS http://localhost:8001/agent/api/ping || exit 1
+  CMD curl -fsS http://localhost:8080/agent/api/ping || exit 1
 
 # Default log level
 ENV LOG_LEVEL=info
@@ -45,7 +45,7 @@ CMD ["sh","-lc","uv run gunicorn api.main:app \
   --error-logfile - \
   --log-level ${LOG_LEVEL:-info} \
   -w ${WEB_CONCURRENCY:-4} \
-  -b 0.0.0.0:${PORT:-8001} \
+  -b 0.0.0.0:${PORT:-8080} \
   --timeout ${WORKER_TIMEOUT:-120} \
   --graceful-timeout ${GRACEFUL_TIMEOUT:-30} \
   --keep-alive ${KEEP_ALIVE:-75}"]

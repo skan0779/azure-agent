@@ -12,7 +12,7 @@ from graphs.graph import LangGraphProcess
 
 from api.routes.chat import router as chat_router
 from api.routes.ping import router as ping_router
-from azure_agent.api.routes.delete_thread import router as thread_router
+from api.routes.delete_thread import router as thread_router
 
 logger = logging.getLogger(__name__)
 

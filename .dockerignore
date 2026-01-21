@@ -82,3 +82,7 @@ docker-compose*
 
 # CI/CD
 .github/
+
+# Examples
+examples/
+.env.dev
