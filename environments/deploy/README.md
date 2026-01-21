@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/docs/icons/Docker.svg.svg" height="72" alt="Docker" />
+  <img src="/docs/icons/Docker.svg" height="72" alt="Docker" />
 </p>
 
 <h1 align="center">Deployment (Docker)</h1>
