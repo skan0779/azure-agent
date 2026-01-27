@@ -68,13 +68,24 @@ async def chat_stream(req: ChatRequest, request: Request):
                 # Handle event types
                 etype = evt.get("type", "")
                 if etype in ("delta", "event", "title", "error", "updates"):
+                    
+                    # Load Content
                     content = evt.get("content", "")
                     if content is None:
                         content = ""
                     elif not isinstance(content, str):
                         content = str(content)
 
-                    yield sse_pack({"type": etype, "content": content})
+                    # Load payload
+                    payload = {"type": etype, "content": content}
+
+                    # Load Step (optional)
+                    step = evt.get("step")
+                    if step is not None:
+                        payload["step"] = step
+
+                    # Yield payload
+                    yield sse_pack(payload)
 
                 elif etype == "complete":
                     yield sse_pack({"type": "complete"})

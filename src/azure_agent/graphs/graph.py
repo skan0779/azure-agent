@@ -474,12 +474,7 @@ class LangGraphProcess:
             inputs, 
             config,
             subgraphs=True,
-            stream_mode=[
-                "messages", 
-                "updates", 
-                "custom",
-                # "debug" # (optional)
-            ],
+            stream_mode=["messages", "updates", "custom"],
         )
         try:
             async for event in stream:
@@ -522,7 +517,6 @@ class LangGraphProcess:
                     node = None
                     if isinstance(metadata, dict):
                         node = metadata.get("langgraph_node")
-                        # logger.info("[graph.py] Streaming Node: %s", node)
                     
                     # Filter Node
                     if not node or node not in STREAM_NODES:
@@ -541,48 +535,18 @@ class LangGraphProcess:
 
                 # Stream Updates
                 elif mode == "updates":
-                    
-                    # Parse Payload
                     data, metadata = payload, {}
                     if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[1], dict):
                         data, metadata = payload
                     if not isinstance(data, dict):
                         continue
 
-                    # Stream Events
-                    for _node_name, patch in data.items():
-                        if not isinstance(patch, dict):
-                            continue
-
-                        msgs = patch.get("messages")
-                        if not isinstance(msgs, list) or not msgs:
-                            continue
-
-                        for m in msgs:
-                            # Tool Calls
-                            if isinstance(m, AIMessage):
-                                tool_calls = getattr(m, "tool_calls", None) or []
-                                for tc in tool_calls:
-                                    tc_obj = tc
-                                    if not isinstance(tc_obj, dict):
-                                        dump = getattr(tc_obj, "model_dump", None)
-                                        if callable(dump):
-                                            tc_obj = dump()
-                                        else:
-                                            tc_dict = getattr(tc_obj, "__dict__", None)
-                                            tc_obj = tc_dict if isinstance(tc_dict, dict) else {"tool_call": str(tc_obj)}
-
-                                    yield {
-                                        "type": "updates",
-                                        "content": json.dumps(tc_obj, ensure_ascii=False)
-                                    }
-
-                            # Tool Results
-                            elif isinstance(m, ToolMessage):
-                                yield {
-                                    "type": "updates",
-                                    "content": str(getattr(m, "content", "") or "")
-                                }
+                    for step, patch in data.items():
+                        yield {
+                            "type": "updates",
+                            "step": step,
+                            "content": patch,
+                        }
 
                 # Stream Custom
                 elif mode == "custom":
@@ -600,31 +564,6 @@ class LangGraphProcess:
                     if isinstance(data, dict) and data.get("type") == "title":
                         yield {"type": "title", "content": data.get("content", "")}
             
-                # Stream Debug (optional)
-                # elif mode == "debug":
-                #     e = payload
-                #     if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[0], dict):
-                #         e = payload[0]
-                #     if not isinstance(e, dict):
-                #         logger.info("[debug] raw=%s", e)
-                #         continue
-
-                #     et = e.get("type")
-                #     step = e.get("step")
-                #     pl = e.get("payload") or {}
-                #     name = pl.get("name")
-
-                #     # task: 노드 실행 시작
-                #     if et == "task":
-                #         logger.info("[debug] step=%s task name=%s triggers=%s", step, name, pl.get("triggers"))
-
-                #     # task_result: 노드 실행 결과
-                #     elif et == "task_result":
-                #         err = pl.get("error")
-                #         logger.info("[debug] step=%s result name=%s error=%s", step, name, bool(err))
-                #     else:
-                #         logger.info("[debug] step=%s type=%s payload_keys=%s", step, et, list(pl.keys()) if isinstance(pl, dict) else type(pl).__name__)
-
             # Completion Event
             yield {"type": "complete"}
         
