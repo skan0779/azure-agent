@@ -26,7 +26,10 @@ az acr login -n <acr-name>
 > Build docker image with Docker Desktop
 ```bash
 # Build Image
-docker build -f environments/deploy/Dockerfile -t azure-agent:local .
+docker buildx build --platform linux/amd64 \
+  -f environments/deploy/Dockerfile \
+  -t azure-agent:local \
+  --load .
 
 # Run (Optional)
 docker run --rm -p 8080:8080 -e PORT=8080 \

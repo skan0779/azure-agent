@@ -54,7 +54,7 @@ async def chat_stream(req: ChatRequest, request: Request):
     agent = getattr(request.app.state, "agent", None)
     if agent is None:
         raise HTTPException(status_code=500, detail="Failed Agent Initialization")
-
+    
     async def gen() -> AsyncGenerator[str, None]:
         try:
             async for evt in agent.main(
@@ -62,21 +62,20 @@ async def chat_stream(req: ChatRequest, request: Request):
                 user_id=req.user_id,
                 user_query=req.user_query,
             ):
-                if isinstance(evt, tuple):
-                    msg, _meta = evt
-                    delta = getattr(msg, "content", "") or ""
-                    if delta:
-                        yield sse_pack({"type": "delta", "content": delta})
+                if not isinstance(evt, dict):
                     continue
-
+                
+                # Handle event types
                 etype = evt.get("type", "")
+                if etype in ("delta", "event", "title", "error", "updates"):
+                    content = evt.get("content", "")
+                    if content is None:
+                        content = ""
+                    elif not isinstance(content, str):
+                        content = str(content)
 
-                if etype == "delta":
-                    yield sse_pack({"type": "delta", "content": evt.get("content", "")})
-                elif etype == "event":
-                    yield sse_pack({"type": "event", "content": evt.get("content", "")})
-                elif etype == "title":
-                    yield sse_pack({"type": "title", "content": evt.get("content", "")})
+                    yield sse_pack({"type": etype, "content": content})
+
                 elif etype == "complete":
                     yield sse_pack({"type": "complete"})
                     return

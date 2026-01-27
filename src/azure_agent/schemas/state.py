@@ -18,7 +18,6 @@ class AgentState(TypedDict, total=False):
     """
     # Messages
     messages: Annotated[list, add_messages]
-    # messages: Annotated[list, add_messages_capped]
 
     # Basic Inputs
     thread_id: Annotated[str, "Thread ID"]

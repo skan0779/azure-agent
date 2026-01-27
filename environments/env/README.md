@@ -39,9 +39,10 @@ Use this path if you cannot reach the Key Vault due to network restrictions (no 
 > Create a VM in the same VNet/Subnet with a public IP and NSG inbound SSH rules.
 
 ### 2.4 Set secrets from the VM
+> Virtual Machine > Connect > **Configure JIT + Request access**
 ```bash
 # SSH into the VM
-ssh -i "<local-key-path>" <vm-user>@<vm-public-ip>
+ssh -i "<local-key-path>" <vm-user-name>@<vm-public-ip>
 
 # Restrict private key permissions
 chmod 600 <local-key-path>

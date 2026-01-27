@@ -1,4 +1,4 @@
-import os, yaml, logging, inspect, json
+import os, yaml, logging, inspect
 from pathlib import Path
 
 from azure.core.credentials import AzureKeyCredential
@@ -10,44 +10,47 @@ from azure.search.documents import SearchClient
 import redis.asyncio as aioredis
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
-    ModelRetryMiddleware,
     ModelFallbackMiddleware,
+    ModelRetryMiddleware,
     ToolCallLimitMiddleware,
     ToolRetryMiddleware,
-    SummarizationMiddleware,
     PIIMiddleware,
+    SummarizationMiddleware,
+    TodoListMiddleware,
 )
+
+from deepagents.middleware import FilesystemMiddleware, SubAgentMiddleware
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 
 from langchain_tavily import TavilySearch
 
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
+from langgraph.graph import StateGraph, START, END
 
 from schemas.state import AgentState
 
 from middlewares.stream import event_stream_before_agent, event_stream_before_model
+from middlewares.state import update_state_after_agent
 
 from tools.azure_ai_search import create_azure_ai_search_tool
+
+from edges.router_edge import router_conditional_edge
+from edges.guardrail_edge import guardrail_conditional_edge
+
+from nodes.router_node import create_router_node
+from nodes.guardrail_node import create_guardrail_node
 
 logger = logging.getLogger(__name__)
 
 
 class LangGraphProcess:
-    """
-    LangGraphProcess Application Configuration and Runtime Resource Manager that Performs:
-        - Load Azure Key Vault Secrets
-        - Create Azure OpenAI Models (Main, Small, Embedding)
-        - Create Azure AI Search Client
-        - Create Redis Client
-        - Create Checkpointer (Shallow Redis)
-        - Create Store (Postgres)
-        - Build Agent runnable
-    """
+
     def __init__(self) -> None:
         """
         Initalize Application Configuration and dependencies that Performs:
@@ -170,7 +173,7 @@ class LangGraphProcess:
             Create Redis Client
             Create Checkpointer (Shallow Redis): ttl 1 day
             Create  Store (Postgres): ttl 30 days
-            Build Agent runnable
+            Compile StateGraph
         """
         # Redis Client
         self.redis_client = aioredis.Redis(
@@ -367,18 +370,29 @@ class LangGraphProcess:
 
     def _build_graph(self, checkpointer=None, store=None):
         """
-        LangGraphProcess builder that returns the agent runnable:
+        LangGraphProcess StateGraph Compiler that builds:
+            State:
+                AgentState: TypedDict Schema
             Tools:
-                azure_ai_search_tool: RAG tool
-            Agent:
-                main_agent: main conversational react agent
+                azure_ai_search_tool: RAG Tool
+            Nodes:
+                Guardrail: Token limit & PII
+                Router: Routing to agents
+                Main Agent: Main Conversational Agent
+                Document Agent: Document Generation Agent
+            Edges:
+                Guardrail Conditional Edge
+                Router Conditional Edge
         
         Args:
             checkpointer: checkpoint saver Instance
             store: data store Instance
         Returns:
-            Runnable: Agent runnable
+            StateGraph: LangGraphProcess StateGraph Instance
         """
+        # Build Graph
+        builder = StateGraph(AgentState)
+
         # Create Azure AI Search Tool
         azure_ai_search_tool = create_azure_ai_search_tool(
             azure_ai_search_client=self.azure_ai_search_client,
@@ -389,6 +403,22 @@ class LangGraphProcess:
 
         # Create Tavily Search Tool
         tavily_search_tool = TavilySearch(max_results=3, topic="general")
+
+        # Create Guardrail Node
+        guardrail_node = create_guardrail_node(
+            ENCODER=self.TIKTOKEN_ENCODER,
+            TOKEN_LIMIT=30000,
+            # PII_HOST=self.PII_HOST,
+            PII_CHUNK=10000,
+        )
+        builder.add_node("guardrail", guardrail_node)
+
+        # Create Router Node
+        router_node = create_router_node(
+            model=self.small_model,
+            system_prompt=self._load_prompt("router_prompt.yaml"),
+        )
+        builder.add_node("router", router_node)
         
         # Create Main Agent
         main_agent = create_agent(
@@ -401,39 +431,127 @@ class LangGraphProcess:
             middleware=[
                 # Model Middleware
                 ModelCallLimitMiddleware(run_limit=2, exit_behavior="end"),
-                # ModelRetryMiddleware(max_retries=1),
+                # ModelRetryMiddleware(max_retries=0),
                 # ModelFallbackMiddleware(self.small_model),
                 
                 # Tool Middleware
                 ToolCallLimitMiddleware(run_limit=1, exit_behavior="continue"),
-                # ToolRetryMiddleware(max_retries=1),
+                # ToolRetryMiddleware(max_retries=0),
                 
-                # Message Middleware
-                SummarizationMiddleware(
-                    model=self.small_model,
-                    trigger=[("tokens", 20000)],
-                    keep=("messages", 20),
-                    token_counter=self.small_model.get_num_tokens_from_messages,
-                ),
+                # Message Middleware (Optional)
+                # SummarizationMiddleware(
+                #     model=self.small_model,
+                #     trigger=[("tokens", 20000)],
+                #     keep=("messages", 10),
+                #     token_counter=self.small_model.get_num_tokens_from_messages,
+                # ),
 
-                # # PII Middleware
-                PIIMiddleware("email", strategy="mask"),
-                PIIMiddleware("credit_card", strategy="mask"),
-                PIIMiddleware("ip", strategy="redact"),
-                PIIMiddleware("mac_address", strategy="redact"),
-                PIIMiddleware("url", strategy="redact"),
+                # PII Middleware (Optional)
+                # PIIMiddleware("email", strategy="mask"),
+                # PIIMiddleware("credit_card", strategy="mask"),
+                # PIIMiddleware("ip", strategy="redact"),
+                # PIIMiddleware("mac_address", strategy="redact"),
+                # PIIMiddleware("url", strategy="redact"),
 
-                # # Custom Middleware
+                # Custom Middleware
                 event_stream_before_agent,
                 event_stream_before_model,
             ],
             state_schema=AgentState,
-            checkpointer=checkpointer,
-            store=store,
             name="main_agent",
         )
+        builder.add_node("main_agent", main_agent)
 
-        return main_agent
+        # Create Deep Agent
+        deep_agent = create_agent(
+            model=self.main_model,
+            system_prompt=self._load_prompt("deep_agent_prompt.yaml"),
+            store=store,
+            middleware=[
+                # Deep Agent Middleware
+                TodoListMiddleware(),
+                FilesystemMiddleware(
+                    backend=lambda runtime: CompositeBackend(
+                        default=StateBackend(runtime),
+                        routes={
+                            "/memories/": StoreBackend(runtime),
+                        },
+                    )
+                ),
+                SubAgentMiddleware(
+                    default_model=self.main_model,
+                    subagents = [
+                        {
+                            "name": "research",
+                            "description": "Research and gather facts. Return concise bullet points and sources if available.",
+                            "system_prompt": self._load_prompt("researcher_prompt.yaml"),
+                            "tools": [tavily_search_tool],
+                            "middleware": [
+                                ToolCallLimitMiddleware(
+                                    tool_name=tavily_search_tool.name,
+                                    run_limit=1,
+                                    exit_behavior="continue",
+                                )
+                            ],
+                        },
+                        {
+                            "name": "writer",
+                            "description": "Write a clean final answer based on provided notes.",
+                            "system_prompt": self._load_prompt("writer_prompt.yaml"),
+                        },
+                    ]
+                ),
+
+                # Model Middleware (Optional)
+                ModelCallLimitMiddleware(run_limit=10, exit_behavior="end"),
+                # ModelRetryMiddleware(max_retries=2),
+
+                # Tool Middleware (Optional)
+                ToolCallLimitMiddleware(run_limit=10, exit_behavior="continue"),
+                # ToolRetryMiddleware(max_retries=2),
+                
+                # Message Middleware (Optional)
+                # SummarizationMiddleware(
+                #     model=self.small_model,
+                #     trigger=[("tokens", 10000)],
+                #     keep=("messages", 20),
+                #     token_counter=self.small_model.get_num_tokens_from_messages,
+                # ),
+
+                # Custom Middleware
+                event_stream_before_agent,
+                event_stream_before_model,
+                update_state_after_agent,
+            ],
+            state_schema=AgentState,
+            name="deep_agent",
+        )
+        builder.add_node("deep_agent", deep_agent)
+        
+        # Define Edges and Conditonal Edges
+        builder.add_edge(START, "guardrail")
+        builder.add_conditional_edges(
+            "guardrail",
+            guardrail_conditional_edge,
+            {
+                "router":"router",
+                END:END,
+            },
+        )
+        builder.add_conditional_edges(
+            "router",
+            router_conditional_edge,
+            {
+                "main_agent": "main_agent",
+                "deep_agent": "deep_agent",
+                END:END,
+            },
+        )
+        builder.add_edge("main_agent", END)
+        builder.add_edge("deep_agent", END)
+
+        # Compile Graph
+        return builder.compile(checkpointer=checkpointer, store=store)
 
     async def main(
         self,
@@ -465,126 +583,59 @@ class LangGraphProcess:
 
         # Runnable Config
         config = RunnableConfig(
-            recursion_limit=50,
+            recursion_limit=15,
             configurable={"thread_id": thread_id},
         )
 
         # Stream Processing
         stream = self.graph.astream(
             inputs, 
-            config,
+            config, 
             subgraphs=True,
-            stream_mode=[
-                "messages", 
-                "updates", 
-                "custom",
-                # "debug" # (optional)
-            ],
+            stream_mode=["messages", "custom"]
         )
         try:
             async for event in stream:
-                namespace = None
-                mode = None
-                payload = None
-                data = event
 
-                # Parse Payload (namespace, data)
-                if isinstance(data, tuple) and len(data) == 2 and isinstance(data[0], tuple):
-                    namespace, data = data
-
-                # Parse Payload (mode, payload)
-                if isinstance(data, tuple) and len(data) == 2 and isinstance(data[0], str):
-                    mode, payload = data
-                elif isinstance(data, tuple) and len(data) == 3 and isinstance(data[1], str):
-                    namespace, mode, payload = data
-                elif isinstance(data, tuple) and len(data) == 2:
-                    mode, payload = "messages", data
-                elif isinstance(data, dict):
-                    mode, payload = "updates", data
+                # Parse Event
+                if isinstance(event, tuple): 
+                    if len(event) == 2 and isinstance(event[0], str):
+                        mode, payload = event
+                    elif len(event) == 3 and isinstance(event[1], str):
+                        namespace, mode, payload = event
+                    else:
+                        mode, payload = "messages", event
                 else:
-                    mode, payload = "custom", data
+                    mode, payload = "messages", event
 
                 # Stream Messages
                 if mode == "messages":
-
-                    STREAM_NODES = {"model"}
+                    
+                    # Stream Specific Nodes
+                    STREAM_BLOCKED_NODES = ["router"]
 
                     # Parse Payload
                     msg, metadata = payload, None
-                    if isinstance(payload, tuple) and len(payload) == 2:
-                        msg, metadata = payload
+                    if isinstance(payload, tuple):
+                        msg = payload[0]
+                        metadata = payload[1] if len(payload) > 1 else None
 
-                    # Filter AIMessageChunk
+                    # Stream Only AIMessage Chunks
                     if not isinstance(msg, AIMessageChunk):
                         continue
 
-                    # Parse Node
-                    node = None
-                    if isinstance(metadata, dict):
-                        node = metadata.get("langgraph_node")
-                        # logger.info("[graph.py] Streaming Node: %s", node)
-                    
-                    # Filter Node
-                    if not node or node not in STREAM_NODES:
+                    # Stream Specific Messages
+                    additional_kwargs = dict(getattr(msg, "additional_kwargs", None) or {})
+                    node = (metadata or {}).get("langgraph_node")
+                    stream_msg = bool(additional_kwargs.get("stream") or False)
+                    if node in STREAM_BLOCKED_NODES and not stream_msg:
                         continue
-                    
-                    # Stream Delta (text)
-                    text = getattr(msg, "text", None)
-                    if text:
-                        yield {"type": "delta", "content": text}
-                        continue
-                    
-                    # Stream Delta (str)
-                    content = getattr(msg, "content", None)
-                    if content:
-                        yield {"type": "delta", "content": str(content)}
+                    else:
+                        content = getattr(msg, "content", None)
+                        if content:
+                            yield {"type": "delta", "content": str(content)}
 
-                # Stream Updates
-                elif mode == "updates":
-                    
-                    # Parse Payload
-                    data, metadata = payload, {}
-                    if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[1], dict):
-                        data, metadata = payload
-                    if not isinstance(data, dict):
-                        continue
-
-                    # Stream Events
-                    for _node_name, patch in data.items():
-                        if not isinstance(patch, dict):
-                            continue
-
-                        msgs = patch.get("messages")
-                        if not isinstance(msgs, list) or not msgs:
-                            continue
-
-                        for m in msgs:
-                            # Tool Calls
-                            if isinstance(m, AIMessage):
-                                tool_calls = getattr(m, "tool_calls", None) or []
-                                for tc in tool_calls:
-                                    tc_obj = tc
-                                    if not isinstance(tc_obj, dict):
-                                        dump = getattr(tc_obj, "model_dump", None)
-                                        if callable(dump):
-                                            tc_obj = dump()
-                                        else:
-                                            tc_dict = getattr(tc_obj, "__dict__", None)
-                                            tc_obj = tc_dict if isinstance(tc_dict, dict) else {"tool_call": str(tc_obj)}
-
-                                    yield {
-                                        "type": "updates",
-                                        "content": json.dumps(tc_obj, ensure_ascii=False)
-                                    }
-
-                            # Tool Results
-                            elif isinstance(m, ToolMessage):
-                                yield {
-                                    "type": "updates",
-                                    "content": str(getattr(m, "content", "") or "")
-                                }
-
-                # Stream Custom
+                # Stream Custom Events
                 elif mode == "custom":
 
                     # Parse Payload
@@ -600,31 +651,6 @@ class LangGraphProcess:
                     if isinstance(data, dict) and data.get("type") == "title":
                         yield {"type": "title", "content": data.get("content", "")}
             
-                # Stream Debug (optional)
-                # elif mode == "debug":
-                #     e = payload
-                #     if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[0], dict):
-                #         e = payload[0]
-                #     if not isinstance(e, dict):
-                #         logger.info("[debug] raw=%s", e)
-                #         continue
-
-                #     et = e.get("type")
-                #     step = e.get("step")
-                #     pl = e.get("payload") or {}
-                #     name = pl.get("name")
-
-                #     # task: 노드 실행 시작
-                #     if et == "task":
-                #         logger.info("[debug] step=%s task name=%s triggers=%s", step, name, pl.get("triggers"))
-
-                #     # task_result: 노드 실행 결과
-                #     elif et == "task_result":
-                #         err = pl.get("error")
-                #         logger.info("[debug] step=%s result name=%s error=%s", step, name, bool(err))
-                #     else:
-                #         logger.info("[debug] step=%s type=%s payload_keys=%s", step, et, list(pl.keys()) if isinstance(pl, dict) else type(pl).__name__)
-
             # Completion Event
             yield {"type": "complete"}
         
