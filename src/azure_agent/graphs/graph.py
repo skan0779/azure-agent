@@ -474,7 +474,12 @@ class LangGraphProcess:
             inputs, 
             config,
             subgraphs=True,
-            stream_mode=["messages", "updates", "custom"],
+            stream_mode=[
+                "messages", 
+                "updates", 
+                "custom",
+                # "debug" # (optional)
+            ],
         )
         try:
             async for event in stream:
@@ -564,6 +569,31 @@ class LangGraphProcess:
                     if isinstance(data, dict) and data.get("type") == "title":
                         yield {"type": "title", "content": data.get("content", "")}
             
+                # Stream Debug (optional)
+                # elif mode == "debug":
+                #     e = payload
+                #     if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[0], dict):
+                #         e = payload[0]
+                #     if not isinstance(e, dict):
+                #         logger.info("[debug] raw=%s", e)
+                #         continue
+
+                #     et = e.get("type")
+                #     step = e.get("step")
+                #     pl = e.get("payload") or {}
+                #     name = pl.get("name")
+
+                #     # task: 노드 실행 시작
+                #     if et == "task":
+                #         logger.info("[debug] step=%s task name=%s triggers=%s", step, name, pl.get("triggers"))
+
+                #     # task_result: 노드 실행 결과
+                #     elif et == "task_result":
+                #         err = pl.get("error")
+                #         logger.info("[debug] step=%s result name=%s error=%s", step, name, bool(err))
+                #     else:
+                #         logger.info("[debug] step=%s type=%s payload_keys=%s", step, et, list(pl.keys()) if isinstance(pl, dict) else type(pl).__name__)
+
             # Completion Event
             yield {"type": "complete"}
         
