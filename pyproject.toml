@@ -36,6 +36,7 @@ dependencies = [
     "langgraph-checkpoint-postgres>=3.0.3",
     "langchain-tavily>=0.2.16",
     "psycopg[binary]>=3.3.2",
+    "langmem>=0.0.30",
 ]
 
 [tool.setuptools]

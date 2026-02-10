@@ -23,12 +23,15 @@ from langchain.agents.middleware import (
     PIIMiddleware,
 )
 
-from langchain_tavily import TavilySearch
-
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
 
+from langchain_tavily import TavilySearch
+
+from langmem import create_manage_memory_tool, create_search_memory_tool
+
 from schemas.state import AgentState
+from schemas.store import UserProfile
 
 from middlewares.stream import event_stream_before_agent, event_stream_before_model
 
@@ -74,6 +77,7 @@ class LangGraphProcess:
         self.AZURE_OPENAI_MAIN_MODEL = secret_client.get_secret("AZURE-OPENAI-MAIN-MODEL").value
         self.AZURE_OPENAI_SMALL_MODEL = secret_client.get_secret("AZURE-OPENAI-SMALL-MODEL").value
         self.AZURE_OPENAI_EMBEDDING_MODEL = secret_client.get_secret("AZURE-OPENAI-EMBEDDING-MODEL").value
+        self.AZURE_OPENAI_EMBEDDING_DIMS = secret_client.get_secret("AZURE-OPENAI-EMBEDDING-DIMS").value
         
         # Azure AI Search
         self.AZURE_AI_SEARCH_ENDPOINT = secret_client.get_secret("AZURE-AI-SEARCH-ENDPOINT").value
@@ -216,6 +220,10 @@ class LangGraphProcess:
                 "default_ttl": 60 * 24 * 30,
                 "refresh_on_read": True, 
             },
+            index={
+                "dims": int(self.AZURE_OPENAI_EMBEDDING_DIMS),
+                "embed": self.embedding_model,
+            }
         )
         
         self._store_cm = store_cm
@@ -379,6 +387,20 @@ class LangGraphProcess:
         Returns:
             Runnable: Agent runnable
         """
+        # Create Manage Memory Tool
+        manage_memory = create_manage_memory_tool(
+            namespace=("memories", "{user_id}", "profile"),
+            schema=UserProfile,
+            actions_permitted=("create", "update", "delete"),
+            name="manage_memory",
+        )
+
+        # Create Search Memory Tool
+        search_memory = create_search_memory_tool(
+            namespace=("memories", "{user_id}"),
+            name="search_memory",
+        )
+
         # Create Azure AI Search Tool
         azure_ai_search_tool = create_azure_ai_search_tool(
             azure_ai_search_client=self.azure_ai_search_client,
@@ -394,20 +416,19 @@ class LangGraphProcess:
         main_agent = create_agent(
             model=self.main_model,
             tools=[
-                azure_ai_search_tool,
-                tavily_search_tool,
+                manage_memory,          # LangMem Tool
+                search_memory,          # LangMem Tool
+                azure_ai_search_tool,   # RAG Tool
+                tavily_search_tool,     # Web Search Tool
             ],
             system_prompt=self._load_prompt("main_agent_prompt.yaml"),
             middleware=[
                 # Model Middleware
-                ModelCallLimitMiddleware(run_limit=2, exit_behavior="end"),
-                # ModelRetryMiddleware(max_retries=1),
-                # ModelFallbackMiddleware(self.small_model),
-                
+                ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
+
                 # Tool Middleware
-                ToolCallLimitMiddleware(run_limit=1, exit_behavior="continue"),
-                # ToolRetryMiddleware(max_retries=1),
-                
+                ToolCallLimitMiddleware(run_limit=5, exit_behavior="continue"),
+
                 # Message Middleware
                 SummarizationMiddleware(
                     model=self.small_model,
@@ -416,14 +437,14 @@ class LangGraphProcess:
                     token_counter=self.small_model.get_num_tokens_from_messages,
                 ),
 
-                # # PII Middleware
-                PIIMiddleware("email", strategy="mask"),
+                # PII Middleware
+                PIIMiddleware("email", strategy="mask"),    # PII Middleware
                 PIIMiddleware("credit_card", strategy="mask"),
                 PIIMiddleware("ip", strategy="redact"),
                 PIIMiddleware("mac_address", strategy="redact"),
                 PIIMiddleware("url", strategy="redact"),
 
-                # # Custom Middleware
+                # Custom Middleware
                 event_stream_before_agent,
                 event_stream_before_model,
             ],
@@ -466,7 +487,10 @@ class LangGraphProcess:
         # Runnable Config
         config = RunnableConfig(
             recursion_limit=50,
-            configurable={"thread_id": thread_id},
+            configurable={
+                "thread_id": thread_id,
+                "user_id": user_id,
+            },
         )
 
         # Stream Processing
@@ -474,12 +498,7 @@ class LangGraphProcess:
             inputs, 
             config,
             subgraphs=True,
-            stream_mode=[
-                "messages", 
-                "updates", 
-                "custom",
-                # "debug" # (optional)
-            ],
+            stream_mode=["messages", "updates", "custom"],
         )
         try:
             async for event in stream:
@@ -568,32 +587,7 @@ class LangGraphProcess:
                     # Stream Custom Title
                     if isinstance(data, dict) and data.get("type") == "title":
                         yield {"type": "title", "content": data.get("content", "")}
-            
-                # Stream Debug (optional)
-                # elif mode == "debug":
-                #     e = payload
-                #     if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[0], dict):
-                #         e = payload[0]
-                #     if not isinstance(e, dict):
-                #         logger.info("[debug] raw=%s", e)
-                #         continue
-
-                #     et = e.get("type")
-                #     step = e.get("step")
-                #     pl = e.get("payload") or {}
-                #     name = pl.get("name")
-
-                #     # task: 노드 실행 시작
-                #     if et == "task":
-                #         logger.info("[debug] step=%s task name=%s triggers=%s", step, name, pl.get("triggers"))
-
-                #     # task_result: 노드 실행 결과
-                #     elif et == "task_result":
-                #         err = pl.get("error")
-                #         logger.info("[debug] step=%s result name=%s error=%s", step, name, bool(err))
-                #     else:
-                #         logger.info("[debug] step=%s type=%s payload_keys=%s", step, et, list(pl.keys()) if isinstance(pl, dict) else type(pl).__name__)
-
+           
             # Completion Event
             yield {"type": "complete"}
         
