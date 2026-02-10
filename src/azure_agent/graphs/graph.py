@@ -438,11 +438,8 @@ class LangGraphProcess:
                 ),
 
                 # PII Middleware
-                PIIMiddleware("email", strategy="mask"),    # PII Middleware
+                PIIMiddleware("email", strategy="mask"),
                 PIIMiddleware("credit_card", strategy="mask"),
-                PIIMiddleware("ip", strategy="redact"),
-                PIIMiddleware("mac_address", strategy="redact"),
-                PIIMiddleware("url", strategy="redact"),
 
                 # Custom Middleware
                 event_stream_before_agent,
