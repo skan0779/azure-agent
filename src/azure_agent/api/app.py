@@ -9,8 +9,10 @@ from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redi
 from fastapi.staticfiles import StaticFiles
 
 from graphs.graph import LangGraphProcess
+from infra.key_vault import create_secret_client
+from infra.redis import close_redis_client, create_redis_stream_client
 
-from api.routes.chat import router as chat_router
+from api.routes.job import router as job_router
 from api.routes.ping import router as ping_router
 from api.routes.delete_thread import router as thread_router
 
@@ -26,11 +28,24 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
+    # Initialize Secret Client
+    secret_client = create_secret_client()
 
     # Initialize LangGraph Agent
-    agent = LangGraphProcess()
+    agent = LangGraphProcess(secret_client=secret_client)
     if getattr(agent, "graph", None) is None:
         await agent.setup()
+
+    # Initialize Redis Stream Client (queue)
+    redis_stream_client = None
+    try:
+        redis_stream_client = create_redis_stream_client(secret_client)
+        app.state.redis_stream_client = redis_stream_client
+        logger.info("[app.py] Stream Redis Initialize Success")
+    except Exception as exc:
+        app.state.redis_stream_client = None
+        logger.exception("[app.py] Failed to initialize stream redis client")
+        raise RuntimeError("Stream Redis initialization failed") from exc
 
     # App State Initialization
     app.state.agent = agent
@@ -54,7 +69,12 @@ async def lifespan(app: FastAPI):
     # Application Shutdown
     finally:
         agent = getattr(app.state, "agent", None)
+        redis_stream_client = getattr(app.state, "redis_stream_client", None)
         app.state.agent = None
+        app.state.redis_stream_client = None
+
+        if redis_stream_client is not None:
+            await close_redis_client(redis_stream_client)
 
         if agent is not None:
             try:
@@ -71,7 +91,7 @@ def create_app() -> FastAPI:
 
     API Endpoints:
         - /agent/ping: Health check endpoint
-        - /agent/chat: Chat interaction endpoint
+        - /agent/jobs: Async job endpoints
         - /agent/delete_thread: Delete Thread endpoint
     """
 
@@ -125,7 +145,7 @@ def create_app() -> FastAPI:
 
     # API Routes
     app.include_router(ping_router)
-    app.include_router(chat_router)
+    app.include_router(job_router)
     app.include_router(thread_router)
 
     return app
