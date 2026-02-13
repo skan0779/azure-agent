@@ -1,16 +1,16 @@
 import os, yaml, logging, inspect, json
 from pathlib import Path
+from collections.abc import Awaitable, Callable
 
 from azure.core.credentials import AzureKeyCredential
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
 from azure.storage.blob import ContainerClient
 from azure.search.documents import SearchClient
+from azure.keyvault.secrets import SecretClient
 
 import redis.asyncio as aioredis
 
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, AIMessage, AIMessageChunk, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessageChunk
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain.agents.middleware import (
@@ -32,9 +32,7 @@ from langmem import create_manage_memory_tool, create_search_memory_tool
 
 from schemas.state import AgentState
 from schemas.store import UserProfile
-
 from middlewares.stream import event_stream_before_agent, event_stream_before_model
-
 from tools.azure_ai_search import create_azure_ai_search_tool
 
 logger = logging.getLogger(__name__)
@@ -50,8 +48,10 @@ class LangGraphProcess:
         - Create Checkpointer (Shallow Redis)
         - Create Store (Postgres)
         - Build Agent runnable
+    Args:
+        secret_client: Azure Key Vault SecretClient Instance
     """
-    def __init__(self) -> None:
+    def __init__(self, secret_client: SecretClient) -> None:
         """
         Initalize Application Configuration and dependencies that Performs:
             Load Azure Key Vault Client
@@ -59,17 +59,6 @@ class LangGraphProcess:
             Create Azure OpenAI Models (Main, Small, Embedding)     
             Create Azure AI Search Client
         """
-        # Azure Key Vault
-        vault_url = os.getenv("KEY_VAULT_URL")
-        if not vault_url:
-            logger.error("[graph.py] Failed to load KEY_VAULT_URL from environment variables")
-            raise RuntimeError("[graph.py] Failed to load KEY_VAULT_URL from environment variables")
-        credential = DefaultAzureCredential()
-        secret_client = SecretClient(
-            vault_url=vault_url,
-            credential=credential,
-        )
-        
         # Azure OpenAI
         self.AZURE_OPENAI_ENDPOINT = secret_client.get_secret("AZURE-OPENAI-ENDPOINT").value
         self.AZURE_OPENAI_API_KEY = secret_client.get_secret("AZURE-OPENAI-API-KEY").value
@@ -101,7 +90,7 @@ class LangGraphProcess:
         self.REDIS_ACCESS_KEY = secret_client.get_secret("REDIS-ACCESS-KEY").value
         self.REDIS_PORT = secret_client.get_secret("REDIS-PORT").value
         self.REDIS_DB = secret_client.get_secret("REDIS-DB").value
-
+        
         # Postgres
         self.POSTGRES_CONN_STRING = secret_client.get_secret("POSTGRES-CONN-STRING").value
 
@@ -183,10 +172,10 @@ class LangGraphProcess:
             username=self.REDIS_USERNAME,
             password=self.REDIS_ACCESS_KEY,
             db=int(self.REDIS_DB or 0),
-            ssl=True,
             decode_responses=False,
+            ssl=True,
             socket_connect_timeout=5,
-            socket_timeout=5,
+            socket_timeout=20,
             retry_on_timeout=True
         )
 
@@ -590,9 +579,38 @@ class LangGraphProcess:
         
         # Exception Handling
         except Exception as exc:
-            logger.error("[graph.py] LangGraphProcess processing error : %s", exc)
+            logger.exception("[graph.py] LangGraphProcess processing error")
+            raise
         
-        # Cleanup (per requests)
+        # Cleanup
         finally:
             if hasattr(stream, "aclose"):
                 await stream.aclose()
+
+    async def run_job(
+        self,
+        thread_id: str,
+        user_id: str,
+        user_query: str,
+        cancel: Callable[[], Awaitable[bool]] | None = None,
+    ):
+        """
+        JobWorker LangGraphProcess execution wrapper.
+        Args:
+            thread_id: Thread ID (Session ID)
+            user_id: User ID
+            user_query: User Query
+            cancel (optional): Cancellation callable.
+        Yields:
+            Streamed Events (Messages, Custom Events)
+        """
+        async for event in self.main(
+            thread_id=thread_id,
+            user_id=user_id,
+            user_query=user_query,
+        ):
+            if cancel is not None and await cancel():
+                yield {"type": "cancelled", "content": "Job cancelled"}
+                yield {"type": "complete"}
+                return
+            yield event

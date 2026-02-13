@@ -37,7 +37,11 @@ async def _delete_checkpoint(redis_client, pattern: str, scan_count: int = 512) 
     return removed
 
 
-@router.post("/agent/api/delete_thread", response_model=DeleteThreadResponse, tags=["Thread"])
+@router.post(
+    "/agent/api/delete_thread", 
+    response_model=DeleteThreadResponse, 
+    tags=["Thread"]
+)
 async def delete_thread(req: DeleteThreadRequest, request: Request):
     
     # LangGraph Agent Instance
