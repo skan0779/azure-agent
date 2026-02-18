@@ -34,6 +34,9 @@ async def create_job_endpoint(req: JobCreateRequest, request: Request):
             user_id=req.user_id,
             user_query=req.user_query,
             idempotency_key=req.idempotency_key,
+            job_ttl_seconds=60 * 60 * 24 * 1,  # 1 day
+            idempotency_ttl_seconds=60 * 60 * 24 * 1,  # 1 day
+            request_stream_maxlen=100_000, # 100K
         )
     except Exception as exc:
         logger.exception("[job.py] Failed to create job: %s", exc)

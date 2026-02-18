@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import asyncio, logging, os, signal, sys
+import asyncio, logging, os, signal, sys, uuid
 from typing import Any
 
 from redis.exceptions import ResponseError
@@ -24,9 +24,10 @@ class JobWorker:
     Job Worker that processes jobs.
     """
     def __init__(self) -> None:
+        host = os.getenv("HOSTNAME") or "unknown"
         self.request_stream_key = "agent:requests"
         self.consumer_group = "agent-workers"
-        self.consumer_name = f"worker-{os.getpid()}"
+        self.consumer_name = f"worker-{host}-{uuid.uuid4().hex[:12]}"
         self.read_block_ms = 10000
         self.read_count = 1
         self.event_ttl_seconds = 86400
@@ -57,6 +58,17 @@ class JobWorker:
         # Setup LangGraph Agent
         if getattr(self.agent, "graph", None) is None:
             await self.agent.setup()
+
+        # Start Store TTL Sweeper
+        store = getattr(self.agent, "store", None)
+        if store is not None:
+            start = getattr(store, "start_ttl_sweeper", None)
+            if callable(start):
+                try:
+                    await start(sweep_interval_minutes=60)
+                    logger.info("[worker.main] Postgres TTL sweeper started")
+                except Exception as exc:
+                    logger.warning("[worker.main] Failed to start Postgres TTL sweeper: %s", exc)
 
         # Create Redis Stream Consumer Group
         await self._create_consumer_group()

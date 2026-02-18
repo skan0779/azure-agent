@@ -7,7 +7,7 @@ from azure.storage.blob import ContainerClient
 from azure.search.documents import SearchClient
 from azure.keyvault.secrets import SecretClient
 
-import redis.asyncio as aioredis
+from redis.asyncio import Redis
 
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessageChunk
@@ -114,14 +114,6 @@ class LangGraphProcess:
             model=self.AZURE_OPENAI_MAIN_MODEL,
             stream_usage=True,
             request_timeout=60,
-
-            # GPT 4.x parameters (Optional)
-            # temperature=0.2,
-
-            # GPT 5.x parameters (Optional)
-            # reasoning_effort="low",
-            # verbosity="low",
-            # max_completion_tokens=1536,
         )
 
         # Azure OpenAI Model (SMALL)
@@ -135,9 +127,6 @@ class LangGraphProcess:
             streaming=True,
             stream_usage=False,
             request_timeout=60,
-
-            # GPT 4.x parameters (Optional)
-            # temperature=0
         )
 
         # Azure OpenAI Model (Embedding)
@@ -166,7 +155,7 @@ class LangGraphProcess:
             Build Agent runnable
         """
         # Redis Client
-        self.redis_client = aioredis.Redis(
+        self.redis_client = Redis(
             host=self.REDIS_HOST,
             port=int(self.REDIS_PORT or 10000),
             username=self.REDIS_USERNAME,
@@ -183,7 +172,7 @@ class LangGraphProcess:
         self.memory = AsyncShallowRedisSaver(
             redis_client=self.redis_client,
             ttl={
-                "default_ttl": 60 * 60 * 24,
+                "default_ttl": 60 * 60 * 24 * 1, # 1 day
                 "refresh_on_read": True,
             },
         )
@@ -206,7 +195,7 @@ class LangGraphProcess:
                 },
             ),
             ttl={
-                "default_ttl": 60 * 24 * 30,
+                "default_ttl": 60 * 60 * 24 * 30, # 30 days
                 "refresh_on_read": True, 
             },
             index={

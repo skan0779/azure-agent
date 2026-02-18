@@ -57,17 +57,3 @@ class JobCancelResponse(BaseModel):
     job_id: str = Field(..., description="job ID")
     cancel_requested: bool = Field(..., description="cancel flag written")
     status: JobStatus = Field(..., description="current job status")
-
-
-
-#### LEGACY DELETE THREAD API SCHEMAS ####
-
-class DeleteThreadRequest(BaseModel):
-    thread_id: str = Field(..., description="target Thread ID")
-
-
-class DeleteThreadResponse(BaseModel):
-    thread_id: str = Field(..., description="deleted Thread ID")
-    checkpoints: int = 0
-    checkpoint_writes: int = 0
-    write_registries: int = 0
