@@ -72,3 +72,4 @@ async def close_redis_client(redis_client: RedisCluster | None) -> None:
                 await maybe
     except Exception:
         pass
+

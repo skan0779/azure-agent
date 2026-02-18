@@ -20,6 +20,7 @@ async def create_job(
     idempotency_key: str | None = None,
     metadata: dict[str, Any] | None = None,
     request_stream_key: str = "agent:requests",
+    request_stream_maxlen: int | None = 100_000,
     job_ttl_seconds: int | None = None,
     idempotency_ttl_seconds: int = 60 * 60 * 24,
 ) -> dict[str, Any]:
@@ -34,6 +35,7 @@ async def create_job(
         idempotency_key (str | None): Optional idempotency key for deduplication
         metadata (dict[str, Any] | None): Optional metadata to store with the job
         request_stream_key (str): Redis stream key for enqueuing job requests
+        request_stream_maxlen (int | None): Maximum length of the Redis stream
         job_ttl_seconds (int | None): Optional TTL for the job hash in seconds
         idempotency_ttl_seconds (int): TTL for the idempotency key in seconds
     Returns:
@@ -71,6 +73,8 @@ async def create_job(
                         reenqueue_id_raw = await redis_client.xadd(
                             request_stream_key,
                             fields=reenqueue_fields,
+                            maxlen=request_stream_maxlen,
+                            approximate=True,
                         )
                         reenqueue_id = (
                             reenqueue_id_raw.decode("utf-8", errors="replace")
@@ -166,6 +170,8 @@ async def create_job(
         request_stream_id_raw = await redis_client.xadd(
             request_stream_key,
             fields=request_fields,
+            maxlen=request_stream_maxlen,
+            approximate=True,
         )
         request_stream_id = (
             request_stream_id_raw.decode("utf-8", errors="replace")
