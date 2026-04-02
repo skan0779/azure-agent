@@ -1,14 +1,22 @@
-# token encoder
-![tiktoken 0.11.0](https://img.shields.io/badge/tiktoken-0.11.0-6E4AFF) ![Air-gapped ready](https://img.shields.io/badge/Air--gapped-ready-0E7C7B)
-> tiktoken encoder cache for air-gapped environment
+<p align="center">
+  <img src="/docs/icons/OpenAI.svg" height="72" alt="OpenAI" />
+</p>
 
-Cache location can be overridden with `AZURE_AGENT_TIKTOKEN_CACHE_DIR`.
-Default is `src/azure_agent/encoder`.
+<h1 align="center">Token Encoder</h1>
+
+<p align="center">
+  Cache location can be overridden with </code>AZURE_AGENT_TIKTOKEN_CACHE_DIR</code>.
+  Default is </code>src/azure_agent/encoder</code>.
+</p>
+
+![tiktoken 0.11.0](https://img.shields.io/badge/tiktoken-0.11.0-6E4AFF) ![Air-gapped ready](https://img.shields.io/badge/Air--gapped-ready-0E7C7B)
+
 
 ---
 
 
 ## 1. Encoder list
+> tiktoken encoder cache for air-gapped environment
 
 | Encoder | Supported Model | Cache Hash |
 | --- | --- | --- |
