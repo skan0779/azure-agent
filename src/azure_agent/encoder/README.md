@@ -9,7 +9,10 @@
   Default is </code>src/azure_agent/encoder</code>.
 </p>
 
-![tiktoken 0.11.0](https://img.shields.io/badge/tiktoken-0.11.0-6E4AFF) ![Air-gapped ready](https://img.shields.io/badge/Air--gapped-ready-0E7C7B)
+---
+
+![tiktoken 0.11.0](https://img.shields.io/badge/tiktoken-0.11.0-6E4AFF) 
+![Air-gapped ready](https://img.shields.io/badge/Air--gapped-ready-0E7C7B)
 
 
 ---
