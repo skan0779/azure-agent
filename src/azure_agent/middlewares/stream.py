@@ -4,7 +4,7 @@ from langchain.agents.middleware import before_agent, before_model
 
 from langgraph.runtime import Runtime
 
-from schemas.state import AgentState
+from azure_agent.graphs.schema import AgentState
 
 
 @before_agent

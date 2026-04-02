@@ -1,7 +1,7 @@
-from typing import TypedDict, Annotated, Literal
+from typing import Annotated, Literal, Optional, TypedDict
 
-from utils.message import add_messages_capped
 from langgraph.graph.message import add_messages
+from pydantic import BaseModel
 
 
 class AgentState(TypedDict, total=False):
@@ -16,16 +16,16 @@ class AgentState(TypedDict, total=False):
         agent_type (Literal["main_agent", "deep_agent"]): Selected agent type
         guardrail (bool): Guardrail check
     """
-    # Messages
-    messages: Annotated[list, add_messages]
 
-    # Basic Inputs
+    messages: Annotated[list, add_messages]
     thread_id: Annotated[str, "Thread ID"]
     user_id: Annotated[str, "User ID"]
     user_query: Annotated[str, "User Question"]
-
-    # Router
     agent_type: Annotated[Literal["main_agent", "deep_agent"], "Selected Agent Type"]
-    
-    # Guardrail
-    guardrail: Annotated[bool, "Quardrail Check"]
+    guardrail: Annotated[bool, "Guardrail Check"]
+
+
+class UserProfile(BaseModel):
+    name: Optional[str] = None
+    age: Optional[int] = None
+    language: Optional[str] = "ko"

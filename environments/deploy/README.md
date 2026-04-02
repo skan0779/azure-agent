@@ -37,6 +37,8 @@ docker run --rm -p 8080:8080 -e PORT=8080 \
   azure-agent:local
 ```
 
+---
+
 ## 3. Push Image to ACR
 > Push Docker Image to Azure Container Registry
 ```bash
@@ -47,3 +49,38 @@ docker tag azure-agent:local <acr-name>.azurecr.io/azure-agent:v1.x
 docker push <acr-name>.azurecr.io/azure-agent:v1.x
 ```
 
+---
+
+## 4. Create Azure Container Apps
+> Create separate Azure Container App resources for `API` and `Worker`. (Both resources use the same container image tag)
+
+- `api` handles HTTP traffic.
+- `worker` consumes Redis jobs and should not be exposed through ingress.
+
+Recommended layout:
+```text
+ACA #1: azure-agent-api
+- Image: <acr-name>.azurecr.io/azure-agent:v1.x
+- Ingress: enabled
+- Target port: 8080
+- Command override: not required
+
+ACA #2: azure-agent-worker
+- Image: <acr-name>.azurecr.io/azure-agent:v1.x
+- Ingress: disabled
+- Command override: required
+```
+
+---
+
+## 5. Setting Azure Container Apps (Command Override)
+> The `Worker` Container App must override the default container command. (Application > Containers > Properties > Command override) Image default command starts the `API` server.
+
+Worker override values:
+```text
+Command override:
+sh
+
+Arguments override:
+-lc, uv run azure-agent-worker
+```

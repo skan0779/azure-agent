@@ -8,11 +8,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
 from fastapi.staticfiles import StaticFiles
 
-from infra.key_vault import create_secret_client
-from infra.redis import close_redis_client, create_redis_stream_client
-
-from api.routes.job import router as job_router
-from api.routes.ping import router as ping_router
+from azure_agent.api.routes.health import router as health_router
+from azure_agent.api.routes.job import router as job_router
+from azure_agent.config import load_runtime_config
+from azure_agent.api.routes.ping import router as ping_router
+from azure_agent.infra.key_vault import create_secret_client
+from azure_agent.infra.redis import close_redis_client, create_redis_stream_client
+from azure_agent.session import SessionManager
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +28,9 @@ logging.basicConfig(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
+    runtime_config = load_runtime_config()
+    app.state.runtime_config = runtime_config
+
     # Initialize Secret Client
     secret_client = create_secret_client()
 
@@ -34,9 +39,16 @@ async def lifespan(app: FastAPI):
     try:
         redis_stream_client = create_redis_stream_client(secret_client)
         app.state.redis_stream_client = redis_stream_client
+        app.state.session_manager = SessionManager(
+            redis_stream_client,
+            lock_ttl_seconds=runtime_config.session.lock_ttl_seconds,
+            session_ttl_seconds=runtime_config.session.session_ttl_seconds,
+            reservation_ttl_seconds=runtime_config.session.reservation_ttl_seconds,
+        )
         logger.info("[app.py] Stream Redis Initialize Success")
     except Exception as exc:
         app.state.redis_stream_client = None
+        app.state.session_manager = None
         logger.exception("[app.py] Failed to initialize stream redis client")
         raise RuntimeError("Stream Redis initialization failed") from exc
 
@@ -48,6 +60,8 @@ async def lifespan(app: FastAPI):
     finally:
         redis_stream_client = getattr(app.state, "redis_stream_client", None)
         app.state.redis_stream_client = None
+        app.state.session_manager = None
+        app.state.runtime_config = None
 
         if redis_stream_client is not None:
             await close_redis_client(redis_stream_client)
@@ -101,10 +115,11 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=[
             "http://localhost:3000",
-            "http://127.0.0.1:3000",
             "http://localhost:7860",
-            "http://127.0.0.1:7860",
             "http://localhost:5173",
+            "http://localhost:80",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:7860",
             "http://127.0.0.1:5173",
         ],
         allow_credentials=True,
@@ -114,6 +129,7 @@ def create_app() -> FastAPI:
 
     # API Routes
     app.include_router(ping_router)
+    app.include_router(health_router)
     app.include_router(job_router)
 
     return app

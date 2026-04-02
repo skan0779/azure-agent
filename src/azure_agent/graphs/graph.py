@@ -1,11 +1,12 @@
-import os, yaml, logging, inspect, json
+import asyncio, os, yaml, logging, inspect, json
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 
 from azure.core.credentials import AzureKeyCredential
-from azure.storage.blob import ContainerClient
-from azure.search.documents import SearchClient
-from azure.keyvault.secrets import SecretClient
+from azure.storage.blob.aio import ContainerClient
+from azure.search.documents.aio import SearchClient
+from azure.identity.aio import DefaultAzureCredential
+from azure.keyvault.secrets.aio import SecretClient
 
 from redis.asyncio import Redis
 
@@ -30,10 +31,13 @@ from langchain_tavily import TavilySearch
 
 from langmem import create_manage_memory_tool, create_search_memory_tool
 
-from schemas.state import AgentState
-from schemas.store import UserProfile
-from middlewares.stream import event_stream_before_agent, event_stream_before_model
-from tools.azure_ai_search import create_azure_ai_search_tool
+from azure_agent.middlewares.stream import (
+    event_stream_before_agent,
+    event_stream_before_model,
+)
+from azure_agent.infra.key_vault import create_async_secret_client
+from azure_agent.graphs.schema import AgentState, UserProfile
+from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
 
 logger = logging.getLogger(__name__)
 
@@ -49,111 +53,73 @@ class LangGraphProcess:
         - Create Store (Postgres)
         - Build Agent runnable
     Args:
-        secret_client: Azure Key Vault SecretClient Instance
+        vault_url: Optional Azure Key Vault URL override
     """
-    def __init__(self, secret_client: SecretClient) -> None:
+    def __init__(self, vault_url: str | None = None) -> None:
         """
-        Initalize Application Configuration and dependencies that Performs:
-            Load Azure Key Vault Client
-            Load Azure Key Vault Secrets (Azure OpenAI, Storage Account, Managed Redis, Postgres, PII, TikToken)
-            Create Azure OpenAI Models (Main, Small, Embedding)     
-            Create Azure AI Search Client
+        Initialize lightweight application state.
         """
-        # Azure OpenAI
-        self.AZURE_OPENAI_ENDPOINT = secret_client.get_secret("AZURE-OPENAI-ENDPOINT").value
-        self.AZURE_OPENAI_API_KEY = secret_client.get_secret("AZURE-OPENAI-API-KEY").value
-        self.AZURE_OPENAI_API_VERSION = secret_client.get_secret("AZURE-OPENAI-API-VERSION").value
-        self.AZURE_OPENAI_MAIN_MODEL = secret_client.get_secret("AZURE-OPENAI-MAIN-MODEL").value
-        self.AZURE_OPENAI_SMALL_MODEL = secret_client.get_secret("AZURE-OPENAI-SMALL-MODEL").value
-        self.AZURE_OPENAI_EMBEDDING_MODEL = secret_client.get_secret("AZURE-OPENAI-EMBEDDING-MODEL").value
-        self.AZURE_OPENAI_EMBEDDING_DIMS = secret_client.get_secret("AZURE-OPENAI-EMBEDDING-DIMS").value
-        
-        # Azure AI Search
-        self.AZURE_AI_SEARCH_ENDPOINT = secret_client.get_secret("AZURE-AI-SEARCH-ENDPOINT").value
-        self.AZURE_AI_SEARCH_API_KEY = secret_client.get_secret("AZURE-AI-SEARCH-API-KEY").value
-        self.AZURE_AI_SEARCH_INDEX_NAME = secret_client.get_secret("AZURE-AI-SEARCH-INDEX-NAME").value
-        self.AZURE_AI_SEARCH_SEMANTIC_CONFIG = secret_client.get_secret("AZURE-AI-SEARCH-SEMANTIC-CONFIG").value
-        self.AZURE_AI_SEARCH_API_VERSION = secret_client.get_secret("AZURE-AI-SEARCH-API-VERSION").value
-        self.AZURE_AI_SEARCH_TOP_K = secret_client.get_secret("AZURE-AI-SEARCH-TOP-K").value
-        
-        # Blob Storage
-        self.BLOB_CONTAINER_NAME = secret_client.get_secret("BLOB-CONTAINER-NAME").value
-        self.BLOB_CONNECTION_STRING = secret_client.get_secret("BLOB-CONNECTION-STRING").value
-        self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
-            conn_str=self.BLOB_CONNECTION_STRING,
-            container_name=self.BLOB_CONTAINER_NAME,
-        )
+        self.vault_url = vault_url
+        self.secret_client: SecretClient | None = None
+        self.secret_credential: DefaultAzureCredential | None = None
+        self.prompt_cache: dict[str, str] = {}
 
-        # Redis
-        self.REDIS_HOST = secret_client.get_secret("REDIS-HOST").value
-        self.REDIS_USERNAME = secret_client.get_secret("REDIS-USERNAME").value
-        self.REDIS_ACCESS_KEY = secret_client.get_secret("REDIS-ACCESS-KEY").value
-        self.REDIS_PORT = secret_client.get_secret("REDIS-PORT").value
-        self.REDIS_DB = secret_client.get_secret("REDIS-DB").value
-        
-        # Postgres
-        self.POSTGRES_CONN_STRING = secret_client.get_secret("POSTGRES-CONN-STRING").value
+        # Secrets / config
+        self.AZURE_OPENAI_ENDPOINT: str | None = None
+        self.AZURE_OPENAI_API_KEY: str | None = None
+        self.AZURE_OPENAI_API_VERSION: str | None = None
+        self.AZURE_OPENAI_MAIN_MODEL: str | None = None
+        self.AZURE_OPENAI_MAIN_MODEL_TIMEOUT: str | None = None
+        self.AZURE_OPENAI_SMALL_MODEL: str | None = None
+        self.AZURE_OPENAI_SMALL_MODEL_TIMEOUT: str | None = None
+        self.AZURE_OPENAI_EMBEDDING_MODEL: str | None = None
+        self.AZURE_OPENAI_EMBEDDING_DIMS: str | None = None
+        self.AZURE_AI_SEARCH_ENDPOINT: str | None = None
+        self.AZURE_AI_SEARCH_API_KEY: str | None = None
+        self.AZURE_AI_SEARCH_INDEX_NAME: str | None = None
+        self.AZURE_AI_SEARCH_SEMANTIC_CONFIG: str | None = None
+        self.AZURE_AI_SEARCH_API_VERSION: str | None = None
+        self.AZURE_AI_SEARCH_TOP_K: str | None = None
+        self.BLOB_CONTAINER_NAME: str | None = None
+        self.BLOB_CONNECTION_STRING: str | None = None
+        self.REDIS_HOST: str | None = None
+        self.REDIS_USERNAME: str | None = None
+        self.REDIS_ACCESS_KEY: str | None = None
+        self.REDIS_PORT: str | None = None
+        self.REDIS_DB: str | None = None
+        self.POSTGRES_CONN_STRING: str | None = None
+        self.TIKTOKEN_ENCODER: str | None = None
 
-        # Tavily Search
-        os.environ["TAVILY_API_KEY"] = secret_client.get_secret("TAVILY-API-KEY").value
+        # Runtime clients / models
+        self.BLOB_CONTAINER_CLIENT: ContainerClient | None = None
+        self.main_model = None
+        self.small_model = None
+        self.embedding_model = None
+        self.azure_ai_search_client = None
+        self.redis_client = None
+        self.memory = None
+        self.store = None
+        self._store_cm = None
+        self.graph = None
 
-        # PII
-        # self.PII_HOST = secret_client.get_secret("PII-HOST").value
-
-        # TikToken
-        self.TIKTOKEN_ENCODER = secret_client.get_secret("TIKTOKEN-ENCODER").value
         os.environ["TIKTOKEN_CACHE_DIR"] = str(Path(__file__).resolve().parent.parent / "encoder")
-
-        # Azure OpenAI Model (MAIN)
-        self.main_model = AzureChatOpenAI(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_MAIN_MODEL,
-            tiktoken_model_name=self.AZURE_OPENAI_MAIN_MODEL,
-            model=self.AZURE_OPENAI_MAIN_MODEL,
-            stream_usage=True,
-            request_timeout=60,
-        )
-
-        # Azure OpenAI Model (SMALL)
-        self.small_model = AzureChatOpenAI(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_SMALL_MODEL,
-            tiktoken_model_name=self.AZURE_OPENAI_SMALL_MODEL,
-            model=self.AZURE_OPENAI_SMALL_MODEL,
-            streaming=True,
-            stream_usage=False,
-            request_timeout=60,
-        )
-
-        # Azure OpenAI Model (Embedding)
-        self.embedding_model = AzureOpenAIEmbeddings(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_EMBEDDING_MODEL,
-            model=self.AZURE_OPENAI_EMBEDDING_MODEL,
-        )
-
-        # Azure AI Search (Client)
-        self.azure_ai_search_client = SearchClient(
-            endpoint=self.AZURE_AI_SEARCH_ENDPOINT,
-            index_name=self.AZURE_AI_SEARCH_INDEX_NAME,
-            credential=AzureKeyCredential(self.AZURE_AI_SEARCH_API_KEY),
-            api_version=self.AZURE_AI_SEARCH_API_VERSION,
-        )
 
     async def setup(self):
         """
         Initalize Application Runtime Resource that Performs:
+            Load Azure Key Vault Secrets
+            Create Azure OpenAI Models (Main, Small, Embedding)
+            Create Azure AI Search Client
+            Create Blob Client
             Create Redis Client
             Create Checkpointer (Shallow Redis): ttl 1 day
             Create  Store (Postgres): ttl 30 days
+            Load Prompt Cache
             Build Agent runnable
         """
+        await self._load_secrets()
+        self._load_instance()
+
         # Redis Client
         self.redis_client = Redis(
             host=self.REDIS_HOST,
@@ -213,11 +179,130 @@ class LangGraphProcess:
             if inspect.isawaitable(maybe):
                 await maybe
 
+        await self._load_prompts(["example.yaml"])
+
         # Build Graph
         self.graph = self._build_graph(
             checkpointer=self.memory,
             store=self.store,
         )
+
+    async def _load_secrets(self) -> None:
+        self.secret_client, self.secret_credential = create_async_secret_client(
+            self.vault_url
+        )
+
+        secret_names = {
+            "AZURE_OPENAI_ENDPOINT": "AZURE-OPENAI-ENDPOINT",
+            "AZURE_OPENAI_API_KEY": "AZURE-OPENAI-API-KEY",
+            "AZURE_OPENAI_API_VERSION": "AZURE-OPENAI-API-VERSION",
+            "AZURE_OPENAI_MAIN_MODEL": "AZURE-OPENAI-MAIN-MODEL",
+            "AZURE_OPENAI_MAIN_MODEL_TIMEOUT": "AZURE-OPENAI-MAIN-MODEL-TIMEOUT",
+            "AZURE_OPENAI_SMALL_MODEL": "AZURE-OPENAI-SMALL-MODEL",
+            "AZURE_OPENAI_SMALL_MODEL_TIMEOUT": "AZURE-OPENAI-SMALL-MODEL-TIMEOUT",
+            "AZURE_OPENAI_EMBEDDING_MODEL": "AZURE-OPENAI-EMBEDDING-MODEL",
+            "AZURE_OPENAI_EMBEDDING_DIMS": "AZURE-OPENAI-EMBEDDING-DIMS",
+            "AZURE_AI_SEARCH_ENDPOINT": "AZURE-AI-SEARCH-ENDPOINT",
+            "AZURE_AI_SEARCH_API_KEY": "AZURE-AI-SEARCH-API-KEY",
+            "AZURE_AI_SEARCH_INDEX_NAME": "AZURE-AI-SEARCH-INDEX-NAME",
+            "AZURE_AI_SEARCH_SEMANTIC_CONFIG": "AZURE-AI-SEARCH-SEMANTIC-CONFIG",
+            "AZURE_AI_SEARCH_API_VERSION": "AZURE-AI-SEARCH-API-VERSION",
+            "AZURE_AI_SEARCH_TOP_K": "AZURE-AI-SEARCH-TOP-K",
+            "BLOB_CONTAINER_NAME": "BLOB-CONTAINER-NAME",
+            "BLOB_CONNECTION_STRING": "BLOB-CONNECTION-STRING",
+            "REDIS_HOST": "REDIS-HOST",
+            "REDIS_USERNAME": "REDIS-USERNAME",
+            "REDIS_ACCESS_KEY": "REDIS-ACCESS-KEY",
+            "REDIS_PORT": "REDIS-PORT",
+            "REDIS_DB": "REDIS-DB",
+            "POSTGRES_CONN_STRING": "POSTGRES-CONN-STRING",
+            "TAVILY_API_KEY": "TAVILY-API-KEY",
+            "TIKTOKEN_ENCODER": "TIKTOKEN-ENCODER",
+        }
+
+        assert self.secret_client is not None
+        bundles = await asyncio.gather(
+            *(self.secret_client.get_secret(name) for name in secret_names.values())
+        )
+        for attr, bundle in zip(secret_names.keys(), bundles):
+            setattr(self, attr, bundle.value)
+
+        os.environ["TAVILY_API_KEY"] = str(getattr(self, "TAVILY_API_KEY", ""))
+
+    def _load_instance(self) -> None:
+        self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
+            conn_str=str(self.BLOB_CONNECTION_STRING),
+            container_name=str(self.BLOB_CONTAINER_NAME),
+        )
+
+        self.main_model = AzureChatOpenAI(
+            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
+            api_key=self.AZURE_OPENAI_API_KEY,
+            api_version=self.AZURE_OPENAI_API_VERSION,
+            azure_deployment=self.AZURE_OPENAI_MAIN_MODEL,
+            tiktoken_model_name=self.AZURE_OPENAI_MAIN_MODEL,
+            model=self.AZURE_OPENAI_MAIN_MODEL,
+            stream_usage=True,
+            request_timeout=int(self.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
+        )
+
+        self.small_model = AzureChatOpenAI(
+            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
+            api_key=self.AZURE_OPENAI_API_KEY,
+            api_version=self.AZURE_OPENAI_API_VERSION,
+            azure_deployment=self.AZURE_OPENAI_SMALL_MODEL,
+            tiktoken_model_name=self.AZURE_OPENAI_SMALL_MODEL,
+            model=self.AZURE_OPENAI_SMALL_MODEL,
+            streaming=True,
+            stream_usage=False,
+            request_timeout=int(self.AZURE_OPENAI_SMALL_MODEL_TIMEOUT),
+        )
+
+        self.embedding_model = AzureOpenAIEmbeddings(
+            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
+            api_key=self.AZURE_OPENAI_API_KEY,
+            api_version=self.AZURE_OPENAI_API_VERSION,
+            azure_deployment=self.AZURE_OPENAI_EMBEDDING_MODEL,
+            model=self.AZURE_OPENAI_EMBEDDING_MODEL,
+        )
+
+        self.azure_ai_search_client = SearchClient(
+            endpoint=str(self.AZURE_AI_SEARCH_ENDPOINT),
+            index_name=str(self.AZURE_AI_SEARCH_INDEX_NAME),
+            credential=AzureKeyCredential(str(self.AZURE_AI_SEARCH_API_KEY)),
+            api_version=str(self.AZURE_AI_SEARCH_API_VERSION),
+        )
+
+    async def _load_prompts(self, file_names: list[str]) -> None:
+        for file_name in file_names:
+            if file_name in self.prompt_cache:
+                continue
+            # Download from Blob Storage
+            try:
+                if self.BLOB_CONTAINER_CLIENT is None:
+                    raise RuntimeError("Blob container client is not initialized")
+                downloader = await self.BLOB_CONTAINER_CLIENT.download_blob(file_name)
+                raw = (await downloader.readall()).decode("utf-8")
+
+            # Load from Local Repository
+            except Exception as exc:
+                logger.warning(
+                    "[graph.py] Failed to load system prompt from blob storage (%s): %s",
+                    file_name,
+                    exc,
+                )
+                prompt_path = Path(__file__).resolve().parents[1] / "prompts" / file_name
+                try:
+                    raw = await asyncio.to_thread(prompt_path.read_text, encoding="utf-8")
+                except FileNotFoundError:
+                    logger.error(
+                        "[graph.py] Failed to load system prompt from local file: %s",
+                        prompt_path,
+                    )
+                    raise
+
+            data = yaml.safe_load(raw)
+            self.prompt_cache[file_name] = str(data["system"]).strip()
 
     async def close(self) -> None:
         """
@@ -227,7 +312,21 @@ class LangGraphProcess:
             - Cleanup Store context manager
             - Cleanup Checkpointer
             - Cleanup Redis Client, Connection Pool
+            - Cleanup Azure AI Search Client
         """
+        # Cleanup Blob Client
+        blob_container_client = getattr(self, "BLOB_CONTAINER_CLIENT", None)
+        if blob_container_client is not None:
+            try:
+                close = getattr(blob_container_client, "close", None)
+                if callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close blob container client: %s", exc)
+            self.BLOB_CONTAINER_CLIENT = None
+
         # Cleanup Store
         store = getattr(self, "store", None)
         if store is not None:
@@ -243,8 +342,8 @@ class LangGraphProcess:
                         maybe = stop()
                         if inspect.isawaitable(maybe):
                             await maybe
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to stop store sweeper: %s", exc)
 
             # Close Store
             try:
@@ -256,8 +355,8 @@ class LangGraphProcess:
                     maybe = close()
                     if inspect.isawaitable(maybe):
                         await maybe
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close store: %s", exc)
             
             # Remove Reference
             self.store = None
@@ -267,8 +366,8 @@ class LangGraphProcess:
         if store_cm is not None:
             try:
                 await store_cm.__aexit__(None, None, None)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to exit store context manager: %s", exc)
             self._store_cm = None
         
         # Cleanup Checkpointer
@@ -283,8 +382,8 @@ class LangGraphProcess:
                     maybe = close()
                     if inspect.isawaitable(maybe):
                         await maybe
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close checkpointer memory: %s", exc)
 
             # Remove Reference
             self.memory = None
@@ -303,8 +402,8 @@ class LangGraphProcess:
                     maybe = close()
                     if inspect.isawaitable(maybe):
                         await maybe
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close redis client: %s", exc)
             
             # Cleanup Redis Connection Pool
             try:
@@ -315,41 +414,50 @@ class LangGraphProcess:
                         maybe = disconnect()
                         if inspect.isawaitable(maybe):
                             await maybe
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to disconnect redis connection pool: %s", exc)
 
             # Remove Reference
             self.redis_client = None
 
-    def _load_prompt(self, file_name: str) -> str:
-        """
-        LangGraphProcess Prompt Loader.
-        Load a system prompt from Blob Storage or Local File.
-
-        Args:
-            file_name: Prompt file name (e.g., "agent_system.yaml").
-        Returns:
-            system prompt string
-        Raises:
-            FileNotFoundError: If the local prompt file does not exist.
-        """
-        # Download from Blob Storage
-        try:
-            downloader = self.BLOB_CONTAINER_CLIENT.download_blob(file_name)
-            raw = downloader.readall().decode("utf-8")
-
-        # Load from Local Repository
-        except Exception as exc:
-            logger.warning("[graph.py] Failed to load system prompt from blob storage (%s): %s", file_name, exc)
-            prompt_path = Path(__file__).resolve().parents[1] / "prompts" / file_name
+        # Cleanup Azure AI Search Client
+        azure_ai_search_client = getattr(self, "azure_ai_search_client", None)
+        if azure_ai_search_client is not None:
             try:
-                raw = prompt_path.read_text(encoding="utf-8")
-            except FileNotFoundError:
-                logger.error("[graph.py] Failed to load system prompt from local file: %s", prompt_path)
-                raise
-        
-        data = yaml.safe_load(raw)
-        return str(data["system"]).strip()
+                close = getattr(azure_ai_search_client, "close", None)
+                if callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close Azure AI Search client: %s", exc)
+
+            self.azure_ai_search_client = None
+
+        # Cleanup Key Vault Client
+        secret_client = getattr(self, "secret_client", None)
+        if secret_client is not None:
+            try:
+                close = getattr(secret_client, "close", None)
+                if callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close Key Vault client: %s", exc)
+            self.secret_client = None
+
+        secret_credential = getattr(self, "secret_credential", None)
+        if secret_credential is not None:
+            try:
+                close = getattr(secret_credential, "close", None)
+                if callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close Key Vault credential: %s", exc)
+            self.secret_credential = None
 
     def _build_graph(self, checkpointer=None, store=None):
         """
@@ -388,7 +496,10 @@ class LangGraphProcess:
         )
 
         # Create Tavily Search Tool
-        tavily_search_tool = TavilySearch(max_results=3, topic="general")
+        tavily_search_tool = TavilySearch(
+            max_results=3, 
+            topic="general"
+        )
         
         # Create Main Agent
         main_agent = create_agent(
@@ -399,7 +510,7 @@ class LangGraphProcess:
                 azure_ai_search_tool,   # RAG Tool
                 tavily_search_tool,     # Web Search Tool
             ],
-            system_prompt=self._load_prompt("main_agent_prompt.yaml"),
+            system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
                 # Model Middleware
                 ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),

@@ -37,7 +37,12 @@ dependencies = [
     "langchain-tavily>=0.2.16",
     "psycopg[binary]>=3.3.2",
     "langmem>=0.0.30",
+    "slowapi>=0.1.9",
 ]
+
+[project.scripts]
+azure-agent-api = "azure_agent.api.main:main"
+azure-agent-worker = "azure_agent.worker.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

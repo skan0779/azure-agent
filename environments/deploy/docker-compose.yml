@@ -39,7 +39,7 @@ services:
       dockerfile: environments/deploy/Dockerfile
     container_name: azure-agent-worker
     restart: unless-stopped
-    command: ["sh", "-lc", "uv run python -m worker.main"]
+    command: ["sh", "-lc", "uv run azure-agent-worker"]
     environment:
       KEY_VAULT_URL: ${KEY_VAULT_URL}
       PYTHONUNBUFFERED: 1
@@ -53,7 +53,7 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -q 'worker.main'"]
+      test: ["CMD-SHELL", "tr '\\000' ' ' </proc/1/cmdline | grep -q 'azure-agent-worker'"]
       interval: 30s
       timeout: 10s
       retries: 3

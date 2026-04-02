@@ -3,8 +3,7 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS runtime
 
 # Environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONPATH="/app/src/azure_agent"
+    PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
@@ -12,17 +11,18 @@ WORKDIR /app
 # Create user
 RUN useradd -m -u 1000 appuser
 
-# Copy dependency files
+# Copy dependency files and package source
 COPY pyproject.toml uv.lock ./
+COPY src ./src
+COPY README.md ./
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Install Python dependencies
+# Install Python dependencies and the local package
 RUN uv sync --frozen --no-editable \
   && rm -rf /root/.cache/uv /root/.cache/pip /tmp/*
 
-# Copy app code and env files
+# Copy app env files
 COPY environments/env ./environments/env
-COPY src ./src
 
 # Set ownership and drop privileges
 RUN chown -R appuser:appuser /app
@@ -35,7 +35,7 @@ EXPOSE 8080
 ENV LOG_LEVEL=info
 
 # Run Gunicorn via uv (Uvicorn worker)
-CMD ["sh","-lc","uv run gunicorn api.main:app \
+CMD ["sh","-lc","uv run gunicorn azure_agent.api.main:app \
   -k uvicorn.workers.UvicornWorker \
   --access-logfile - \
   --error-logfile - \

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from pydantic import BaseModel
 from typing import Optional, List
@@ -5,7 +6,7 @@ from typing import Optional, List
 from langchain_core.tools import Tool, StructuredTool
 from langchain_openai import AzureOpenAIEmbeddings
 
-from azure.search.documents import SearchClient
+from azure.search.documents.aio import SearchClient
 from azure.search.documents.models import QueryType, VectorizedQuery, QueryCaptionType, QueryAnswerType
 
 logger = logging.getLogger(__name__)
@@ -15,6 +16,10 @@ SEARCH_FIELDS = ['content', 'title', 'sub_title']
 
 # Return Parameters
 SELECT_FIELDS = ['id', 'content', 'title', 'page', 'url']
+
+# Timeout
+EMBED_TIMEOUT_SECONDS = 10
+SEARCH_TIMEOUT_SECONDS = 15
 
 class AzureAISearchService:
 
@@ -29,7 +34,7 @@ class AzureAISearchService:
         Initalize Azure AI Search Tool Configuration
 
         Args:
-            azure_ai_search_client: Azure AI Search Client Instance
+            azure_ai_search_client: Azure AI Search Client Instance (aio)
             embedding_model: Azure OpenAI Embedding Model Instance
             semantic_config: Semantic Configuration Name
             top_k: Number of top results to return
@@ -39,9 +44,9 @@ class AzureAISearchService:
         self.semantic_config = semantic_config
         self.top_k = top_k
 
-    def _embed(self, text: str) -> Optional[List[float]]:
+    async def _aembed(self, text: str) -> Optional[List[float]]:
         """
-        Generate Embeddings for Query Text
+        Generate Embeddings for Query Text (async)
 
         Args:
             text (str): input text
@@ -51,7 +56,13 @@ class AzureAISearchService:
             Exception: embedding failure
         """
         try:
-            return self.embedding_model.embed_query(text)
+            return await asyncio.wait_for(
+                self.embedding_model.aembed_query(text),
+                timeout=EMBED_TIMEOUT_SECONDS,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("[azure_ai_search.py] Embedding query timed out after %ss", EMBED_TIMEOUT_SECONDS)
+            return None
         except Exception as e:
             logger.warning("[azure_ai_search.py] Failed to embed query : %s", e)           
             return None
@@ -130,19 +141,19 @@ class AzureAISearchService:
                 # 'error': f"Serialization error: {str(e)}"
             }
 
-    def search(self, query: str) -> List[dict]:
+    async def asearch(self, query: str) -> List[dict]:
         """
-        Azure AI Search main search function performing hybrid search (semantic, vector)
+        Azure AI Search main search function performing hybrid search (semantic, vector) (async)
         
         Args:
-            query (str): text qeury
+            query (str): text query
         Returns:
             List[dict]: search results
         Raises:
             Exception: search failure
         """
         # Embedding Query
-        embedding = self._embed(query)
+        embedding = await self._aembed(query)
         if embedding is None:
             logger.warning("[azure_ai_search.py] Failed to Generate Query Embeddings")
             return []
@@ -167,8 +178,19 @@ class AzureAISearchService:
             }
 
             # Search Call
-            results = self.azure_ai_search_client.search(**search_params)
-            return [self._serialize(r) for r in results]
+            async def _do_search():
+                results = await self.azure_ai_search_client.search(**search_params)
+                return [self._serialize(r) async for r in results]
+
+            return await asyncio.wait_for(
+                _do_search(),
+                timeout=SEARCH_TIMEOUT_SECONDS,
+            )
+
+        # Timeout Handling
+        except asyncio.TimeoutError:
+            logger.warning("[azure_ai_search.py] Search timed out after %ss", SEARCH_TIMEOUT_SECONDS)
+            return []
         
         # Exception Handling
         except Exception as e:
@@ -191,10 +213,10 @@ def create_azure_ai_search_tool(
     top_k: int = 3,
 ) -> Tool:
     """
-    Create Structured Tool for Azure AI Search
+    Create Structured Tool for Azure AI Search (async)
     
     Args:
-        azure_ai_search_client: Azure AI Search SDK client
+        azure_ai_search_client: Azure AI Search SDK aio client
         embedding_model: Azure OpenAI embeddings
         semantic_config: semantic configuration name
         top_k: Number of top results to return
@@ -209,10 +231,10 @@ def create_azure_ai_search_tool(
         top_k=top_k,
     )
 
-    # Define Search Function
-    def _run(query: str):
+    # Define Async Search Function
+    async def _arun(query: str):
         """
-        Search function wrapper for StructuredTool
+        Async search function wrapper for StructuredTool
 
         Args:
             query (str): search query
@@ -220,12 +242,16 @@ def create_azure_ai_search_tool(
             List[dict]: search results
         """
         logger.info("[azure_ai_search.py] Search Request : %s", query)
-        return service.search(query)
+        return await service.asearch(query)
+
+    def _run(query: str):
+        raise RuntimeError("azure_ai_search_tool only supports async execution")
     
     # Create Structured Tool
     return StructuredTool(
         name="azure_ai_search_tool", 
         description="Azure AI Search Tool for semantic and vector search over documents.",
         func=_run,
+        coroutine=_arun,
         args_schema=SearchInput
     )
