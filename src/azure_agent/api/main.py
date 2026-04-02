@@ -1,13 +1,17 @@
 import uvicorn
 
-from api.app import create_app
+from azure_agent.api.app import create_app
 
 app = create_app()
 
 
-if __name__ == "__main__":
+def main() -> None:
     uvicorn.run(
-        "main:app",
+        "azure_agent.api.main:app",
         host="0.0.0.0",
         port=8080,
     )
+
+
+if __name__ == "__main__":
+    main()
