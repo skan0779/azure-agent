@@ -10,6 +10,8 @@
 [![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
 ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
 
+<br />
+
 ---
 
 
