@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="/docs/icons/Azure-A.svg" height="72" alt="Azure" />
+  <img src="/docs/icons/Azure-Agent.png" height="72" alt="Azure Agent" />
 </p>
 
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Production-ready AI Agent Template optimized for Azure Cloud
+  Production-ready AI Agent Sample optimized for Azure Cloud
 </p>
 
 ---
