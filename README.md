@@ -1,5 +1,5 @@
 <p>
-  <img src="/docs/icons/Azure-Agent.png" width="20%" align="left" alt="Azure Agent" />
+  <img src="/docs/icons/Azure-Agent.png" width="90" align="left" alt="Azure Agent" />
 </p>
 
 <p><strong>Azure Agent</strong></p>
@@ -10,6 +10,7 @@
 [![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
 ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
 
+<br>
 <br>
 
 
