@@ -8,7 +8,7 @@
   Production-ready AI Agent Sample optimized for Azure
 </p>
 
-<div align="center">
+<p align="center">
   <a href="LICENSE">
     <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
   </a>
@@ -18,7 +18,7 @@
   <a href="https://www.python.org/" target="_blank">
     <img src="https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white" alt="Python">
   </a>
-</div>
+</p>
 
 <br>
 
