@@ -1,25 +1,20 @@
-<table>
-  <tr>
-    <td width="110" valign="middle" align="center">
-      <img src="/docs/icons/Azure-Agent.png" width="90" alt="Azure Agent" />
-    </td>
-    <td valign="middle">
-      <h1 style="margin: 0;">Azure Agent</h1>
-      <p style="margin: 0;">
-        Production-ready AI Agent Sample optimized for Azure
-      </p>
-      <p>
-        <a href="LICENSE">
-          <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
-        </a>
-        <a href="https://github.com/skan0779/azure-agent/stargazers">
-          <img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat" alt="Stars" />
-        </a>
-        <img src="https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white" alt="Python" />
-      </p>
-    </td>
-  </tr>
-</table>
+<p align="center">
+  <img src="/docs/icons/Azure-Agent.png" width="20%" alt="Azure Agent" />
+</p>
+
+<h1 align="center">Azure Agent</h1>
+
+<p align="center">
+  Production-ready AI Agent Sample optimized for Azure
+</p>
+
+
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
+![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
+
+<br>
+<br>
 
 
 ## Quickstart
