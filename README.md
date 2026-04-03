@@ -11,8 +11,9 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License"></a>
   <a href="https://github.com/skan0779/azure-agent/stargazers" target="_blank"><img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat" alt="GitHub Stars"></a>
+</p>
+<p align="center">
   <a href="https://www.python.org/" target="_blank"><img src="https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white" alt="Python"></a>
-  <img src="https://img.shields.io/badge/Azure-0078D4?logo=microsoft&logoColor=white" alt="Azure">
   <img src="https://img.shields.io/badge/LangGraph-121212?logo=langchain&logoColor=white" alt="LangGraph">
   <img src="https://img.shields.io/badge/Redis-DC382D?logo=redis&logoColor=white" alt="Redis">
   <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL">
@@ -20,7 +21,6 @@
   <img src="https://img.shields.io/badge/Docker-2496ED?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/uv-DE5FE9?logo=uv&logoColor=white" alt="uv">
 </p>
-
 <br>
 
 
