@@ -4,7 +4,6 @@
 
 <p><strong>Azure Agent</strong></p>
 <p>Production-ready AI Agent Sample optimized for Azure</p>
-<br clear="left" />
 
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
