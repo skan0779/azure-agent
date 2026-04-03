@@ -3,8 +3,8 @@
 </p>
 
 <h1>Azure Agent</h1>
-<p>Production-ready AI Agent Sample optimized for Azure</p>
-<br clear="left" />
+<h3>Production-ready AI Agent Sample optimized for Azure</h3>
+
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
