@@ -8,6 +8,15 @@
   Production-ready AI Agent Sample optimized for Azure
 </p>
 
+<div align="center">
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License" />
+  </a>
+  <a href="https://github.com/skan0779/azure-agent/stargazers">
+    <img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat" alt="Stars" />
+  </a>
+  <img src="https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white" alt="Python" />
+</div>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
