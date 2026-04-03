@@ -1,14 +1,18 @@
 <p align="center">
-  <img src="/docs/icons/Azure-Agent.png" height="72" alt="Azure Agent" />
+  <img src="/docs/icons/Azure-Agent.png" width="50%" alt="Azure Agent" />
+  <h1 align="center">Azure Agent</h1>
 </p>
 
-<h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Production-ready AI Agent Sample optimized for Azure Cloud
+  The Production-ready AI Agent Sample optimized for Azure
 </p>
 
 ---
+
+![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
+[![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 
 ## Project Structure
