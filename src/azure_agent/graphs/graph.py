@@ -669,10 +669,6 @@ class LangGraphProcess:
                     # Stream Custom Event
                     if isinstance(data, dict) and data.get("type") == "event":
                         yield {"type": "event", "content": data.get("content", "")}
-
-                    # Stream Custom Title
-                    if isinstance(data, dict) and data.get("type") == "title":
-                        yield {"type": "title", "content": data.get("content", "")}
            
             # Completion Event
             yield {"type": "complete"}
