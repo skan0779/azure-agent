@@ -2,13 +2,13 @@
   <img src="/docs/icons/Azure-Agent.png" width="20%" align="left" alt="Azure Agent" />
 </p>
 
-<h1>Azure Agent</h1>
-<h3>Production-ready AI Agent Sample optimized for Azure</h3>
+<h2>Azure Agent</h2>
+<p>Production-ready AI Agent Sample optimized for Azure</p>
 
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
 [![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
+![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
 
 ---
 
