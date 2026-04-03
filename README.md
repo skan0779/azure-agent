@@ -2,8 +2,9 @@
   <img src="/docs/icons/Azure-Agent.png" width="20%" align="left" alt="Azure Agent" />
 </p>
 
-<h2>Azure Agent</h2>
+<p><strong>Azure Agent</strong></p>
 <p>Production-ready AI Agent Sample optimized for Azure</p>
+<br clear="left" />
 
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
