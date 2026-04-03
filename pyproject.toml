@@ -18,7 +18,6 @@ dependencies = [
     "python-dotenv",
     "fastapi",
     "uvicorn",
-    "gradio",
     "langchain>=1.2.2",
     "langchain-core>=1.2.6",
     "azure-search-documents",
