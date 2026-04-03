@@ -2,6 +2,13 @@
 name = "azure-agent"
 version = "0.1.0"
 requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [
+  { name = "JUNG SEOK HWAN" },
+]
+classifiers = [
+  "License :: OSI Approved :: MIT License",
+]
 dependencies = [
     "langchain-openai",
     "azure-storage-blob",

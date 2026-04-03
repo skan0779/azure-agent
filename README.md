@@ -1,18 +1,25 @@
-<p align="center">
-  <img src="/docs/icons/Azure-Agent.png" width="50%" alt="Azure Agent" />
-  <h1 align="center">Azure Agent</h1>
-</p>
+<table>
+  <tr>
+    <td width="24%" valign="middle">
+      <img src="/docs/icons/Azure-Agent.png" width="100%" alt="Azure Agent" />
+    </td>
+    <td valign="middle">
+      <h1>Azure Agent</h1>
+    </td>
+  </tr>
+</table>
 
 
 <p align="center">
   The Production-ready AI Agent Sample optimized for Azure
 </p>
 
----
-
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/-Python-3776AB?logo=python&logoColor=white)
 [![Stars](https://img.shields.io/github/stars/skan0779/azure-agent?style=flat)](https://github.com/skan0779/azure-agent/stargazers)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+---
+
 
 
 ## Project Structure
@@ -65,14 +72,18 @@ docker compose -f environments/deploy/docker-compose.yml up --build
 
 ---
 
-
-## API Endpoints
-- `GET /agent/api/ping`
-- `POST /agent/api/user_query/stream` (SSE stream)
-- `POST /agent/api/delete_thread`
-
 ## Swagger UI
 > Swagger UI assets are bundled in `src/azure_agent/api/static` (air-gapped).
 ```bash
 http://<your-azure-container-host>:8001/agent/swagger
 ```
+
+---
+
+## License
+This project is licensed under the MIT License.
+See `LICENSE` for details.
+
+## Third-Party Notices
+Bundled Swagger UI assets may require separate upstream license notice files during redistribution.
+If you update or re-bundle these assets, include all required third-party notices in the distributed package.
