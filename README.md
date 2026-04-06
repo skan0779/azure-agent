@@ -22,8 +22,9 @@
 <br>
 
 ## Quickstart
+>  Provision Azure resources, configure Key Vault, push the image, then deploy API and worker Container Apps.
 
-### 1. Provision Azure resources
+1. Provision Azure resources
 - Azure OpenAI: `gpt-4o-mini`, `text-embedding-3-large`
 - Azure AI Foundry: `model-router` (set `Azure Content Safety`)
 - Azure Managed Redis (OSS)
@@ -36,32 +37,32 @@
 - Azure Storage Account (Blob)
 - Azure AI Search
 
-### 2. Create an Azure AI Search index
+2. Create an Azure AI Search index
 - Create the index schema
 - Upload index documents
 
-### 3. Create an [`Tavily`](https://www.tavily.com/) account (optional)
+3. Create an [Tavily](https://www.tavily.com/) account (optional)
 - Create a Tavily API key
 
-### 4. Upload prompt files to `Azure Blob Storage` (optional)
+4. Upload prompt files to `Azure Blob Storage` (optional)
 - Upload prompt files such as `example.yaml`
 - Blob Storage is the primary source for prompts (fallback to the local prompt files)
 
-### 5. Configure `Azure Key Vault` secrets
+5. Configure `Azure Key Vault` secrets
 - Add secret values from [`.env.keyvault`](./environments/env/.env.keyvault)
 
-### 6. Build and push the Docker image
+6. Build and push the Docker image
 - Build the Docker image
 - Run `az login`
 - Push the Docker image to `Azure Container Registry`
 
-### 7. Deploy `Azure Container Apps`
+7. Deploy `Azure Container Apps`
 - Deploy `azure-agent-api` with ingress enabled on port `8080`
 - Deploy `azure-agent-worker` with ingress disabled (set command override: `sh` & `-lc`, `uv run azure-agent-worker`)
 
-### 8. Configure `Azure Container Apps` Identities and Access
-- Enable a `managed identity`
-- Grant permissions to managed identity: `Key Vault Secrets User`, `Storage Blob Data Reader`
+8. Configure `Azure Container Apps` Identities and Access
+- Enable a Managed Identity
+- Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`
 - Set environment variables from [`.env.example`](./environments/env/.env.example)
 
 ---
