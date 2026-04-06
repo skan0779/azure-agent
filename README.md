@@ -5,7 +5,7 @@
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Production-ready AI Chatbot Agent Sample optimized for Microsoft Azure
+  Production-ready AI Chatbot Agent Template: optimized for Microsoft Azure
 </p>
 
 <p align="center">
@@ -77,11 +77,19 @@
 
 ---
 
-## Feature Checklist
+## Agent Feature Checklist
+> 
+
+---
+
+## Agent Architecture
+> 
+
 
 
 ---
 
 ## License
-This project is licensed under the MIT License. See `LICENSE` for details.
+> This project is licensed under the MIT License. See `LICENSE` for details.
+
 Bundled `Swagger UI assets` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
