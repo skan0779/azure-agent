@@ -25,17 +25,22 @@
 > Required and optional steps to deploy the services.
 
 ### 1. Provision Azure Resources
-- Azure OpenAI: `gpt-4o-mini`, `text-embedding-3-large`
-- Azure AI Foundry: `model-router` (set `Azure Content Safety`)
-- Azure Managed Redis (OSS)
-- Azure Managed Redis (Enterprise, required modules: `RedisJSON`, `RedisSearch`)
-- Azure Database for PostgreSQL
-- Azure Key Vault
-- Azure Container Registry
-- Azure Container Apps Environment
-- Azure Container Apps: `azure-agent-api`, `azure-agent-worker`
-- Azure Storage Account (Blob)
-- Azure AI Search
+
+| Resource | Notes |
+| --- | --- |
+| Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
+| Azure AI Foundry | Deploy `model-router` (set `Azure AI Content Safety`) |
+| Azure AI Search | - |
+| Azure Managed Redis (OSS) | - |
+| Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
+| Azure Database for PostgreSQL | - |
+| Azure Storage Account (Blob) | - |
+| Azure Container Registry | - |
+| Azure Container Apps Environment | - |
+| Azure Container Apps | Deploy `azure-agent-api` service |
+| Azure Container Apps | Deploy `azure-agent-worker` service |
+| Azure Key Vault | -|
+| Log Analytics Workspace | - |
 
 ### 2. Create an Azure AI Search index
 - Create the index schema
@@ -68,9 +73,6 @@
 ---
 
 ## Feature Checklist
-
-
-## Resource Checklist
 
 
 ---
