@@ -31,15 +31,15 @@
 | Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
 | Azure AI Foundry | Deploy `model-router` (set `Azure AI Content Safety`) |
 | Azure AI Search | - |
-| Azure Managed Redis (OSS) | - |
 | Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
+| Azure Managed Redis (OSS) | - |
 | Azure Database for PostgreSQL | - |
 | Azure Storage Account (Blob) | - |
 | Azure Container Registry | - |
 | Azure Container Apps Environment | - |
 | Azure Container Apps | Deploy `azure-agent-api` service |
 | Azure Container Apps | Deploy `azure-agent-worker` service |
-| Azure Key Vault | -|
+| Azure Key Vault | - |
 | Log Analytics Workspace | - |
 
 ### 2. Create an Azure AI Search index
@@ -49,23 +49,23 @@
 ### 3. Create an [Tavily](https://www.tavily.com/) account (optional)
 - Create a Tavily API key
 
-### 4. Upload prompt files to `Azure Blob Storage` (optional)
+### 4. Upload prompt files to Azure Blob Storage (optional)
 - Upload prompt files such as `example.yaml`
 - Blob Storage is the primary source for prompts (fallback to the local prompt files)
 
-### 5. Configure `Azure Key Vault` secrets
+### 5. Configure an Azure Key Vault Secrets
 - Add secret values from [`.env.keyvault`](./environments/env/.env.keyvault)
 
-### 6. Build and push the Docker image
+### 6. Build and Push the Docker Image
 - Build the Docker image
 - Run `az login`
 - Push the Docker image to `Azure Container Registry`
 
-### 7. Deploy `Azure Container Apps`
+### 7. Deploy an Azure Container Apps
 - Deploy `azure-agent-api` with ingress enabled on port `8080`
 - Deploy `azure-agent-worker` with ingress disabled (set command override: `sh` & `-lc`, `uv run azure-agent-worker`)
 
-### 8. Configure `Azure Container Apps` Identities and Access
+### 8. Configure an Azure Container Apps
 - Enable a Managed Identity
 - Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`
 - Set environment variables from [`.env.example`](./environments/env/.env.example)
