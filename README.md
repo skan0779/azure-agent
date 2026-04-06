@@ -45,6 +45,7 @@
 ### 2. Create an Azure AI Search index
 - Create the index schema
 - Upload index documents
+- [`README.md`](./examples/azure_ai_search/README.md)
 
 ### 3. Create an [Tavily](https://www.tavily.com/) account (optional)
 - Create a Tavily API key
