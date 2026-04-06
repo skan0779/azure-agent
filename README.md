@@ -53,14 +53,17 @@
 ### 4. Upload prompt files to Azure Blob Storage (optional)
 - Upload prompt files such as `example.yaml`
 - Blob Storage is the primary source for prompts (fallback to the local prompt files)
+- [`README.md`](./src/azure_agent/prompts/README.md)
 
 ### 5. Configure an Azure Key Vault Secrets
 - Add secret values from [`.env.keyvault`](./environments/env/.env.keyvault)
+- [`README.md`](./environments/env/README.md)
 
 ### 6. Build and Push the Docker Image
 - Build the Docker image
 - Run `az login`
 - Push the Docker image to `Azure Container Registry`
+- [`README.md`](./environments/deploy/README.md)
 
 ### 7. Deploy an Azure Container Apps
 - Deploy `azure-agent-api` with ingress enabled on port `8080`
@@ -70,6 +73,7 @@
 - Enable a Managed Identity
 - Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`
 - Set environment variables from [`.env.example`](./environments/env/.env.example)
+- [`README.md`](./src/azure_agent/api/README.md)
 
 ---
 
