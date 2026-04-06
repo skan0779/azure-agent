@@ -77,15 +77,32 @@
 
 ---
 
-## Agent Feature Checklist
+## Agent Features
 > 
+
+| Category | Resource | Library |
+| --- | --- | --- |
+| Model Routing | --- | --- |
+| RAG | --- | --- |
+| Web Search | --- | --- |
+| Short-term Memory | --- | --- |
+| Long-term Memory | --- | --- |
+| Context Management | --- | --- |
+| Session Management | --- | --- |
+| Response Streaming | --- | --- |
+| Job Queue & Worker | --- | --- |
+| Safety & Guardrails | --- | --- |
+| Secret Management  | --- | --- |
+| Observability | --- | --- |
+| Client Interface | --- | --- |
+
 
 ---
 
 ## Agent Architecture
 > 
 
-
+A
 
 ---
 
