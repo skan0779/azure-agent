@@ -15,9 +15,6 @@
 > Azure Key Vault stores secret values such as API keys, connection strings, and credentials.
 
 ```env
-# Azure Key Vault
-KEY_VAULT_URL=
-
 # Azure OpenAI
 AZURE-OPENAI-ENDPOINT=
 AZURE-OPENAI-API-KEY=
