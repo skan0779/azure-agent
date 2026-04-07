@@ -85,15 +85,16 @@
 | Job Queue & Worker | --- | --- |
 | Session Management | --- | --- |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
-| RAG |  | Azure AI Search |
+| RAG | [Azure AI Search](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/search/azure-search-documents) | Azure AI Search |
 | Web Search | --- | --- |
-| Short-term Memory | --- | --- |
-| Long-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | --- |
-| Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure Database for PostgreSQL, Azure OpenAI |
+| Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
+| Short-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | Azure Managed Redis |
+| Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Prompt Management | --- | --- |
 | Response Streaming | --- | --- |
 | Safety & Guardrails | --- | --- |
 | Secret Management  | --- | --- |
+| Rate Limiting | --- | --- |
 | Observability | --- | --- |
 | Client Interface | --- | --- |
 
