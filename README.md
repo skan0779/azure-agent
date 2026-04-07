@@ -82,16 +82,16 @@
 
 | Category | Library | Resource |
 | --- | --- | --- |
+| Job Queue & Worker | --- | --- |
+| Session Management | --- | --- |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
-| RAG | --- | --- |
+| RAG |  | Azure AI Search |
 | Web Search | --- | --- |
 | Short-term Memory | --- | --- |
-| Long-term Memory | --- | --- |
-| Context Management | --- | --- |
-| Session Management | --- | --- |
+| Long-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | --- |
+| Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure Database for PostgreSQL, Azure OpenAI |
 | Prompt Management | --- | --- |
 | Response Streaming | --- | --- |
-| Job Queue & Worker | --- | --- |
 | Safety & Guardrails | --- | --- |
 | Secret Management  | --- | --- |
 | Observability | --- | --- |
