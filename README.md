@@ -88,7 +88,7 @@
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
 | Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | --- |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
-| Short-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | Azure Managed Redis (Enterprise) |
+| Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Prompt Management | --- | --- |
 | Response Streaming | --- | --- |
