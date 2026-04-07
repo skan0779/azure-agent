@@ -80,15 +80,16 @@
 ## Agent Features
 > 
 
-| Category | Resource | Library |
+| Category | Library | Resource |
 | --- | --- | --- |
-| Model Routing | --- | --- |
+| Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | --- | --- |
 | Web Search | --- | --- |
 | Short-term Memory | --- | --- |
 | Long-term Memory | --- | --- |
 | Context Management | --- | --- |
 | Session Management | --- | --- |
+| Prompt Management | --- | --- |
 | Response Streaming | --- | --- |
 | Job Queue & Worker | --- | --- |
 | Safety & Guardrails | --- | --- |
