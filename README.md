@@ -30,7 +30,7 @@
 | --- | --- |
 | Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
 | Azure AI Foundry | Deploy `model-router` (set `Azure AI Content Safety`) |
-| Azure AI Search | - |
+| Azure AI Search | [Create and Upload Document](./examples/azure_ai_search/README.md) |
 | Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
 | Azure Managed Redis (OSS) | - |
 | Azure Database for PostgreSQL | - |
@@ -39,7 +39,7 @@
 | Azure Container Apps Environment | - |
 | Azure Container Apps | Deploy `azure-agent-api` service |
 | Azure Container Apps | Deploy `azure-agent-worker` service |
-| Azure Key Vault | - |
+| Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 
 ### 2. Create an Azure AI Search index
@@ -82,13 +82,13 @@
 
 | Category | Library | Resource |
 | --- | --- | --- |
-| Job Queue & Worker | --- | --- |
-| Session Management | --- | --- |
+| Job Queue & Worker | --- | Azure Managed Redis (OSS) |
+| Session Management | --- | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
-| RAG | [Azure AI Search](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/search/azure-search-documents) | Azure AI Search |
-| Web Search | --- | --- |
+| RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
+| Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | --- |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
-| Short-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | Azure Managed Redis |
+| Short-term Memory | [AsyncShallowRedisSaver](https://github.com/redis-developer/langgraph-redis) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Prompt Management | --- | --- |
 | Response Streaming | --- | --- |

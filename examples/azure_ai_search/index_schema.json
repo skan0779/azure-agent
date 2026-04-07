@@ -44,7 +44,7 @@
       "retrievable": true
     },
     {
-      "name": "embedding",
+      "name": "content_vector",
       "type": "Collection(Edm.Single)",
       "searchable": true,
       "retrievable": false,

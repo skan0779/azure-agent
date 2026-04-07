@@ -2,9 +2,7 @@ import asyncio, os, yaml, logging, inspect, json
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 
-from azure.core.credentials import AzureKeyCredential
 from azure.storage.blob.aio import ContainerClient
-from azure.search.documents.aio import SearchClient
 from azure.identity.aio import DefaultAzureCredential
 from azure.keyvault.secrets.aio import SecretClient
 
@@ -28,6 +26,8 @@ from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
 
 from langchain_tavily import TavilySearch
+
+from langchain_community.vectorstores.azuresearch import AzureSearch
 
 from langmem import create_manage_memory_tool, create_search_memory_tool
 
@@ -95,7 +95,7 @@ class LangGraphProcess:
         self.main_model = None
         self.small_model = None
         self.embedding_model = None
-        self.azure_ai_search_client = None
+        self.azure_search = None
         self.redis_client = None
         self.memory = None
         self.store = None
@@ -266,11 +266,17 @@ class LangGraphProcess:
             model=self.AZURE_OPENAI_EMBEDDING_MODEL,
         )
 
-        self.azure_ai_search_client = SearchClient(
-            endpoint=str(self.AZURE_AI_SEARCH_ENDPOINT),
+        self.azure_search = AzureSearch(
+            azure_search_endpoint=str(self.AZURE_AI_SEARCH_ENDPOINT),
+            azure_search_key=str(self.AZURE_AI_SEARCH_API_KEY),
             index_name=str(self.AZURE_AI_SEARCH_INDEX_NAME),
-            credential=AzureKeyCredential(str(self.AZURE_AI_SEARCH_API_KEY)),
-            api_version=str(self.AZURE_AI_SEARCH_API_VERSION),
+            embedding_function=self.embedding_model,
+            search_type="semantic_hybrid",
+            semantic_configuration_name=str(self.AZURE_AI_SEARCH_SEMANTIC_CONFIG),
+            vector_search_dimensions=int(self.AZURE_OPENAI_EMBEDDING_DIMS),
+            additional_search_client_options={
+                "api_version": str(self.AZURE_AI_SEARCH_API_VERSION),
+            },
         )
 
     async def _load_prompts(self, file_names: list[str]) -> None:
@@ -420,19 +426,32 @@ class LangGraphProcess:
             # Remove Reference
             self.redis_client = None
 
-        # Cleanup Azure AI Search Client
-        azure_ai_search_client = getattr(self, "azure_ai_search_client", None)
-        if azure_ai_search_client is not None:
+        # Cleanup Azure AI Search clients
+        azure_search = getattr(self, "azure_search", None)
+        if azure_search is not None:
             try:
-                close = getattr(azure_ai_search_client, "close", None)
-                if callable(close):
-                    maybe = close()
-                    if inspect.isawaitable(maybe):
-                        await maybe
+                async_client = getattr(azure_search, "async_client", None)
+                if async_client is not None:
+                    close = getattr(async_client, "close", None)
+                    if callable(close):
+                        maybe = close()
+                        if inspect.isawaitable(maybe):
+                            await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close Azure AI Search async client: %s", exc)
+
+            try:
+                client = getattr(azure_search, "client", None)
+                if client is not None:
+                    close = getattr(client, "close", None)
+                    if callable(close):
+                        maybe = close()
+                        if inspect.isawaitable(maybe):
+                            await maybe
             except Exception as exc:
                 logger.warning("[graph.py] Failed to close Azure AI Search client: %s", exc)
 
-            self.azure_ai_search_client = None
+            self.azure_search = None
 
         # Cleanup Key Vault Client
         secret_client = getattr(self, "secret_client", None)
@@ -488,15 +507,13 @@ class LangGraphProcess:
         )
 
         # Create Azure AI Search Tool
-        azure_ai_search_tool = create_azure_ai_search_tool(
-            azure_ai_search_client=self.azure_ai_search_client,
-            embedding_model=self.embedding_model,
-            semantic_config=self.AZURE_AI_SEARCH_SEMANTIC_CONFIG,
+        azure_ai_search = create_azure_ai_search_tool(
+            azure_ai_search=self.azure_search,
             top_k=int(self.AZURE_AI_SEARCH_TOP_K),
         )
 
         # Create Tavily Search Tool
-        tavily_search_tool = TavilySearch(
+        tavily_search = TavilySearch(
             max_results=3, 
             topic="general"
         )
@@ -507,8 +524,8 @@ class LangGraphProcess:
             tools=[
                 manage_memory,          # LangMem Tool
                 search_memory,          # LangMem Tool
-                azure_ai_search_tool,   # RAG Tool
-                tavily_search_tool,     # Web Search Tool
+                azure_ai_search,        # RAG Tool
+                tavily_search,          # Web Search Tool
             ],
             system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
