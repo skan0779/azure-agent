@@ -5,7 +5,7 @@
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Production-ready AI Chatbot Agent Template: optimized for Microsoft Azure
+  Production-ready Enterprise AI Chatbot Template for Azure
 </p>
 
 <p align="center">
