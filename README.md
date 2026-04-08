@@ -78,7 +78,7 @@
 ---
 
 ## Agent Feature & Checklist
-> 
+> Stateful, Async, Production-oriented Azure AI Agent Stack for Enterprise workloads on Microsoft Azure.
 
 | Category | Library | Resource |
 | --- | --- | --- |
@@ -92,9 +92,13 @@
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
 | Response Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
-| Safety & Guardrails | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware), [AzureAIContentSafety](https://github.com/Azure-Samples/AzureAIContentSafety) | Azure AI Content Safety |
+| PII filter | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | --- |
+| Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
+| Safety classifier | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
+
+
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
-| Rate Limiting | --- | --- |
+| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | --- |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | --- |
 | Client Interface | --- | --- |
 
@@ -104,7 +108,7 @@
 ## Agent Architecture
 > 
 
-A
+not yet
 
 ---
 

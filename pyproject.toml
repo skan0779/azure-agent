@@ -44,6 +44,7 @@ dependencies = [
     "psycopg[binary]>=3.3.2",
     "langmem>=0.0.30",
     "slowapi>=0.1.9",
+    "langchain-azure-ai>=1.2.1",
 ]
 
 [project.scripts]
