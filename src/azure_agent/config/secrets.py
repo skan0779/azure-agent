@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass, fields
+from dataclasses import MISSING, dataclass, fields
 
+from azure.core.exceptions import ResourceNotFoundError
 from azure.keyvault.secrets.aio import SecretClient
 
 
@@ -40,15 +41,34 @@ class AppSecrets:
     TAVILY_API_KEY: str
     # Tiktoken
     TIKTOKEN_ENCODER: str
+    # Azure AI Content Safety (optional)
+    AZURE_AI_CONTENT_SAFETY_ENDPOINT: str = ""
+    AZURE_AI_CONTENT_SAFETY_API_KEY: str = ""
 
 
 async def load_app_secrets(secret_client: SecretClient) -> AppSecrets:
-    field_names = [item.name for item in fields(AppSecrets)]
-    bundles = await asyncio.gather(
-        *(secret_client.get_secret(name.replace("_", "-")) for name in field_names)
+    async def get_secret_value(field_name, default=MISSING):
+        secret_name = field_name.replace("_", "-")
+        try:
+            bundle = await secret_client.get_secret(secret_name)
+            return bundle.value
+        except ResourceNotFoundError:
+            if default is not MISSING:
+                return default
+            raise RuntimeError(f"Missing Key Vault secret: {secret_name}")
+
+    field_defs = fields(AppSecrets)
+    values_list = await asyncio.gather(
+        *(
+            get_secret_value(
+                field_def.name,
+                default=field_def.default,
+            )
+            for field_def in field_defs
+        )
     )
     values = {
-        name: bundle.value
-        for name, bundle in zip(field_names, bundles)
+        field_def.name: value
+        for field_def, value in zip(field_defs, values_list)
     }
     return AppSecrets(**values)

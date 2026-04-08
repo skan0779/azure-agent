@@ -5,6 +5,8 @@ from typing import Any
 
 from redis.exceptions import ResponseError
 
+from langchain_azure_ai.agents.middleware import ContentSafetyViolationError
+
 from azure_agent.config import RuntimeConfig, load_runtime_config
 from azure_agent.graphs.graph import LangGraphProcess
 from azure_agent.infra.key_vault import create_secret_client
@@ -560,6 +562,7 @@ class JobWorker:
                     job_id,
                 )
 
+        # Exception Handling
         except Exception as exc:
             logger.exception("[worker.main] Failed to process job %s: %s", job_id, exc)
             failure_persisted = False

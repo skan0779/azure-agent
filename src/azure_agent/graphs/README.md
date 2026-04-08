@@ -175,4 +175,5 @@ Long-term memory:
 > Safety checks and execution limits for model and tool calls
 
 - `PIIMiddleware`: guardrail and mask `email`, `credit_card` text inputs
-- `Content Safety`: guardrail moderation model inputs
+- `AzurePromptShieldMiddleware`: blocks prompt injection attempts when Azure AI Content Safety secrets are configured
+- `AzureContentModerationMiddleware`: moderates model inputs with Azure AI Content Safety when configured

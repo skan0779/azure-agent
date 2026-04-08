@@ -10,6 +10,11 @@ from redis.asyncio import Redis
 
 from fastapi.encoders import jsonable_encoder
 
+from langchain_azure_ai.agents.middleware import (
+    AzureContentModerationMiddleware,
+    AzurePromptShieldMiddleware,
+)
+
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
@@ -181,15 +186,18 @@ class LangGraphProcess:
         os.environ["TAVILY_API_KEY"] = self.secrets.TAVILY_API_KEY
 
     def _load_instance(self) -> None:
+        # Load Secrets
         if self.secrets is None:
             raise RuntimeError("Secrets are not loaded")
         secrets = self.secrets
 
+        # Initialize Blob Container Client
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
             conn_str=secrets.BLOB_CONNECTION_STRING,
             container_name=secrets.BLOB_CONTAINER_NAME,
         )
 
+        # Initialize Azure OpenAI Models
         self.main_model = AzureChatOpenAI(
             azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
             api_key=secrets.AZURE_OPENAI_API_KEY,
@@ -200,7 +208,6 @@ class LangGraphProcess:
             stream_usage=True,
             request_timeout=int(secrets.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
         )
-
         self.small_model = AzureChatOpenAI(
             azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
             api_key=secrets.AZURE_OPENAI_API_KEY,
@@ -212,7 +219,6 @@ class LangGraphProcess:
             stream_usage=False,
             request_timeout=int(secrets.AZURE_OPENAI_SMALL_MODEL_TIMEOUT),
         )
-
         self.embedding_model = AzureOpenAIEmbeddings(
             azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
             api_key=secrets.AZURE_OPENAI_API_KEY,
@@ -220,7 +226,8 @@ class LangGraphProcess:
             azure_deployment=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
             model=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
         )
-
+        
+        # Initialize Azure AI Search Vectorstore
         self.azure_search = AzureSearch(
             azure_search_endpoint=secrets.AZURE_AI_SEARCH_ENDPOINT,
             azure_search_key=secrets.AZURE_AI_SEARCH_API_KEY,
@@ -236,6 +243,7 @@ class LangGraphProcess:
 
     async def _load_prompts(self, file_names: list[str]) -> None:
         for file_name in file_names:
+            # Check Cache
             if file_name in self.prompt_cache:
                 continue
             # Download from Blob Storage
@@ -446,6 +454,11 @@ class LangGraphProcess:
         Returns:
             Runnable: Agent runnable
         """
+        # Load Secret
+        if self.secrets is None:
+            raise RuntimeError("Secrets are not loaded")
+        secrets = self.secrets
+
         # Create Manage Memory Tool
         manage_memory = create_manage_memory_tool(
             namespace=("memories", "{user_id}", "profile"),
@@ -461,11 +474,9 @@ class LangGraphProcess:
         )
 
         # Create Azure AI Search retriever tool
-        if self.secrets is None:
-            raise RuntimeError("Secrets are not loaded")
         azure_ai_search = create_azure_ai_search_tool(
             azure_ai_search=self.azure_search,
-            top_k=int(self.secrets.AZURE_AI_SEARCH_TOP_K),
+            top_k=int(secrets.AZURE_AI_SEARCH_TOP_K),
         )
 
         # Create Tavily Search Tool
@@ -478,13 +489,17 @@ class LangGraphProcess:
         main_agent = create_agent(
             model=self.main_model,
             tools=[
-                manage_memory,          # LangMem Tool
-                search_memory,          # LangMem Tool
-                azure_ai_search,        # RAG Tool
-                tavily_search,          # Web Search Tool
+                manage_memory,          # LangMem
+                search_memory,          # LangMem
+                azure_ai_search,        # RAG
+                tavily_search,          # Web Search
             ],
             system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
+                # Custom Middleware
+                event_stream_before_agent,
+                event_stream_before_model,
+
                 # Model Middleware
                 ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
 
@@ -503,9 +518,19 @@ class LangGraphProcess:
                 PIIMiddleware("email", strategy="mask"),
                 PIIMiddleware("credit_card", strategy="mask"),
 
-                # Custom Middleware
-                event_stream_before_agent,
-                event_stream_before_model,
+                # Content Safety Middleware
+                AzureContentModerationMiddleware(
+                    endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
+                    credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
+                    categories=["Hate", "SelfHarm", "Sexual", "Violence"],
+                    severity_threshold=4,
+                    exit_behavior="error",
+                ),
+                AzurePromptShieldMiddleware(
+                    endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
+                    credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
+                    exit_behavior="error",
+                ),
             ],
             state_schema=AgentState,
             checkpointer=checkpointer,

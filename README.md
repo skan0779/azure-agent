@@ -31,6 +31,7 @@
 | Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
 | Azure AI Foundry | Deploy `model-router` (set `Azure AI Content Safety`) |
 | Azure AI Search | [Create and Upload Document](./examples/azure_ai_search/README.md) |
+| Azure AI Content Safety | - |
 | Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
 | Azure Managed Redis (OSS) | - |
 | Azure Database for PostgreSQL | - |
@@ -86,19 +87,19 @@
 | Session Management | Custom `SessionManager` | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
-| Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | --- |
+| Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | - |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [Langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
-| Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
-| Response Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
-| PII filter | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | --- |
 | Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | Safety classifier | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
+| PII filter | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | - |
+| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - |
+| Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
-| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | --- |
-| Observability | [Langfuse](https://github.com/langfuse/langfuse) | --- |
-| Client Interface | --- | --- |
+| Response Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
+| Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
+| Client Interface | - | - |
 
 
 ---
