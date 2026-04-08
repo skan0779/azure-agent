@@ -29,7 +29,7 @@
 | Resource | Notes |
 | --- | --- |
 | Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
-| Azure AI Foundry | Deploy `model-router` (set `Azure AI Content Safety`) |
+| Azure AI Foundry | Deploy `model-router` |
 | Azure AI Search | [Create and Upload Document](./examples/azure_ai_search/README.md) |
 | Azure AI Content Safety | - |
 | Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
