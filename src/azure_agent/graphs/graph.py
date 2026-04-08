@@ -8,8 +8,9 @@ from azure.keyvault.secrets.aio import SecretClient
 
 from redis.asyncio import Redis
 
+from fastapi.encoders import jsonable_encoder
 from langchain.agents import create_agent
-from langchain_core.messages import HumanMessage, AIMessageChunk
+from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
 from langchain.agents.middleware import (
@@ -31,11 +32,12 @@ from langchain_community.vectorstores.azuresearch import AzureSearch
 
 from langmem import create_manage_memory_tool, create_search_memory_tool
 
+from azure_agent.infra.key_vault import create_async_secret_client
+from azure_agent.config import AppSecrets, load_app_secrets
 from azure_agent.middlewares.stream import (
     event_stream_before_agent,
     event_stream_before_model,
 )
-from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.graphs.schema import AgentState, UserProfile
 from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
 
@@ -44,14 +46,14 @@ logger = logging.getLogger(__name__)
 
 class LangGraphProcess:
     """
-    LangGraphProcess Application Configuration and Runtime Resource Manager that Performs:
-        - Load Azure Key Vault Secrets
-        - Create Azure OpenAI Models (Main, Small, Embedding)
-        - Create Azure AI Search Client
-        - Create Redis Client
-        - Create Checkpointer (Shallow Redis)
-        - Create Store (Postgres)
-        - Build Agent runnable
+    LangGraphProcess application configuration and runtime resource manager:
+    - Load Azure Key Vault Secrets
+    - Create Azure OpenAI models (main, small, embedding)
+    - Create Azure AI Search vectorstore and retriever-backed tool
+    - Create Redis Client
+    - Create Checkpointer (Shallow Redis)
+    - Create Store (Postgres)
+    - Build Agent runnable
     Args:
         vault_url: Optional Azure Key Vault URL override
     """
@@ -62,33 +64,8 @@ class LangGraphProcess:
         self.vault_url = vault_url
         self.secret_client: SecretClient | None = None
         self.secret_credential: DefaultAzureCredential | None = None
+        self.secrets: AppSecrets | None = None
         self.prompt_cache: dict[str, str] = {}
-
-        # Secrets / config
-        self.AZURE_OPENAI_ENDPOINT: str | None = None
-        self.AZURE_OPENAI_API_KEY: str | None = None
-        self.AZURE_OPENAI_API_VERSION: str | None = None
-        self.AZURE_OPENAI_MAIN_MODEL: str | None = None
-        self.AZURE_OPENAI_MAIN_MODEL_TIMEOUT: str | None = None
-        self.AZURE_OPENAI_SMALL_MODEL: str | None = None
-        self.AZURE_OPENAI_SMALL_MODEL_TIMEOUT: str | None = None
-        self.AZURE_OPENAI_EMBEDDING_MODEL: str | None = None
-        self.AZURE_OPENAI_EMBEDDING_DIMS: str | None = None
-        self.AZURE_AI_SEARCH_ENDPOINT: str | None = None
-        self.AZURE_AI_SEARCH_API_KEY: str | None = None
-        self.AZURE_AI_SEARCH_INDEX_NAME: str | None = None
-        self.AZURE_AI_SEARCH_SEMANTIC_CONFIG: str | None = None
-        self.AZURE_AI_SEARCH_API_VERSION: str | None = None
-        self.AZURE_AI_SEARCH_TOP_K: str | None = None
-        self.BLOB_CONTAINER_NAME: str | None = None
-        self.BLOB_CONNECTION_STRING: str | None = None
-        self.REDIS_HOST: str | None = None
-        self.REDIS_USERNAME: str | None = None
-        self.REDIS_ACCESS_KEY: str | None = None
-        self.REDIS_PORT: str | None = None
-        self.REDIS_DB: str | None = None
-        self.POSTGRES_CONN_STRING: str | None = None
-        self.TIKTOKEN_ENCODER: str | None = None
 
         # Runtime clients / models
         self.BLOB_CONTAINER_CLIENT: ContainerClient | None = None
@@ -106,14 +83,16 @@ class LangGraphProcess:
 
     async def setup(self):
         """
-        Initalize Application Runtime Resource that Performs:
+        Initialize application runtime resources.
+
+        Responsibilities:
             Load Azure Key Vault Secrets
-            Create Azure OpenAI Models (Main, Small, Embedding)
-            Create Azure AI Search Client
+            Create Azure OpenAI models (main, small, embedding)
+            Create Azure AI Search vectorstore
             Create Blob Client
             Create Redis Client
             Create Checkpointer (Shallow Redis): ttl 1 day
-            Create  Store (Postgres): ttl 30 days
+            Create Store (Postgres): ttl 30 days
             Load Prompt Cache
             Build Agent runnable
         """
@@ -121,12 +100,15 @@ class LangGraphProcess:
         self._load_instance()
 
         # Redis Client
+        if self.secrets is None:
+            raise RuntimeError("Secrets are not loaded")
+        secrets = self.secrets
         self.redis_client = Redis(
-            host=self.REDIS_HOST,
-            port=int(self.REDIS_PORT or 10000),
-            username=self.REDIS_USERNAME,
-            password=self.REDIS_ACCESS_KEY,
-            db=int(self.REDIS_DB or 0),
+            host=secrets.REDIS_HOST,
+            port=int(secrets.REDIS_PORT),
+            username=secrets.REDIS_USERNAME,
+            password=secrets.REDIS_ACCESS_KEY,
+            db=int(secrets.REDIS_DB),
             decode_responses=False,
             ssl=True,
             socket_connect_timeout=5,
@@ -146,7 +128,7 @@ class LangGraphProcess:
 
         # Store 
         store_cm = AsyncPostgresStore.from_conn_string(
-            conn_string=self.POSTGRES_CONN_STRING,
+            conn_string=secrets.POSTGRES_CONN_STRING,
             pool_config=PoolConfig(
                 min_size=1,
                 max_size=5,
@@ -165,7 +147,7 @@ class LangGraphProcess:
                 "refresh_on_read": True, 
             },
             index={
-                "dims": int(self.AZURE_OPENAI_EMBEDDING_DIMS),
+                "dims": int(secrets.AZURE_OPENAI_EMBEDDING_DIMS),
                 "embed": self.embedding_model,
             }
         )
@@ -192,90 +174,62 @@ class LangGraphProcess:
             self.vault_url
         )
 
-        secret_names = {
-            "AZURE_OPENAI_ENDPOINT": "AZURE-OPENAI-ENDPOINT",
-            "AZURE_OPENAI_API_KEY": "AZURE-OPENAI-API-KEY",
-            "AZURE_OPENAI_API_VERSION": "AZURE-OPENAI-API-VERSION",
-            "AZURE_OPENAI_MAIN_MODEL": "AZURE-OPENAI-MAIN-MODEL",
-            "AZURE_OPENAI_MAIN_MODEL_TIMEOUT": "AZURE-OPENAI-MAIN-MODEL-TIMEOUT",
-            "AZURE_OPENAI_SMALL_MODEL": "AZURE-OPENAI-SMALL-MODEL",
-            "AZURE_OPENAI_SMALL_MODEL_TIMEOUT": "AZURE-OPENAI-SMALL-MODEL-TIMEOUT",
-            "AZURE_OPENAI_EMBEDDING_MODEL": "AZURE-OPENAI-EMBEDDING-MODEL",
-            "AZURE_OPENAI_EMBEDDING_DIMS": "AZURE-OPENAI-EMBEDDING-DIMS",
-            "AZURE_AI_SEARCH_ENDPOINT": "AZURE-AI-SEARCH-ENDPOINT",
-            "AZURE_AI_SEARCH_API_KEY": "AZURE-AI-SEARCH-API-KEY",
-            "AZURE_AI_SEARCH_INDEX_NAME": "AZURE-AI-SEARCH-INDEX-NAME",
-            "AZURE_AI_SEARCH_SEMANTIC_CONFIG": "AZURE-AI-SEARCH-SEMANTIC-CONFIG",
-            "AZURE_AI_SEARCH_API_VERSION": "AZURE-AI-SEARCH-API-VERSION",
-            "AZURE_AI_SEARCH_TOP_K": "AZURE-AI-SEARCH-TOP-K",
-            "BLOB_CONTAINER_NAME": "BLOB-CONTAINER-NAME",
-            "BLOB_CONNECTION_STRING": "BLOB-CONNECTION-STRING",
-            "REDIS_HOST": "REDIS-HOST",
-            "REDIS_USERNAME": "REDIS-USERNAME",
-            "REDIS_ACCESS_KEY": "REDIS-ACCESS-KEY",
-            "REDIS_PORT": "REDIS-PORT",
-            "REDIS_DB": "REDIS-DB",
-            "POSTGRES_CONN_STRING": "POSTGRES-CONN-STRING",
-            "TAVILY_API_KEY": "TAVILY-API-KEY",
-            "TIKTOKEN_ENCODER": "TIKTOKEN-ENCODER",
-        }
-
         assert self.secret_client is not None
-        bundles = await asyncio.gather(
-            *(self.secret_client.get_secret(name) for name in secret_names.values())
-        )
-        for attr, bundle in zip(secret_names.keys(), bundles):
-            setattr(self, attr, bundle.value)
+        self.secrets = await load_app_secrets(self.secret_client)
 
-        os.environ["TAVILY_API_KEY"] = str(getattr(self, "TAVILY_API_KEY", ""))
+        os.environ["TAVILY_API_KEY"] = self.secrets.TAVILY_API_KEY
 
     def _load_instance(self) -> None:
+        if self.secrets is None:
+            raise RuntimeError("Secrets are not loaded")
+        secrets = self.secrets
+
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
-            conn_str=str(self.BLOB_CONNECTION_STRING),
-            container_name=str(self.BLOB_CONTAINER_NAME),
+            conn_str=secrets.BLOB_CONNECTION_STRING,
+            container_name=secrets.BLOB_CONTAINER_NAME,
         )
 
         self.main_model = AzureChatOpenAI(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_MAIN_MODEL,
-            tiktoken_model_name=self.AZURE_OPENAI_MAIN_MODEL,
-            model=self.AZURE_OPENAI_MAIN_MODEL,
+            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
+            api_key=secrets.AZURE_OPENAI_API_KEY,
+            api_version=secrets.AZURE_OPENAI_API_VERSION,
+            azure_deployment=secrets.AZURE_OPENAI_MAIN_MODEL,
+            tiktoken_model_name=secrets.AZURE_OPENAI_MAIN_MODEL,
+            model=secrets.AZURE_OPENAI_MAIN_MODEL,
             stream_usage=True,
-            request_timeout=int(self.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
+            request_timeout=int(secrets.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
         )
 
         self.small_model = AzureChatOpenAI(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_SMALL_MODEL,
-            tiktoken_model_name=self.AZURE_OPENAI_SMALL_MODEL,
-            model=self.AZURE_OPENAI_SMALL_MODEL,
+            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
+            api_key=secrets.AZURE_OPENAI_API_KEY,
+            api_version=secrets.AZURE_OPENAI_API_VERSION,
+            azure_deployment=secrets.AZURE_OPENAI_SMALL_MODEL,
+            tiktoken_model_name=secrets.AZURE_OPENAI_SMALL_MODEL,
+            model=secrets.AZURE_OPENAI_SMALL_MODEL,
             streaming=True,
             stream_usage=False,
-            request_timeout=int(self.AZURE_OPENAI_SMALL_MODEL_TIMEOUT),
+            request_timeout=int(secrets.AZURE_OPENAI_SMALL_MODEL_TIMEOUT),
         )
 
         self.embedding_model = AzureOpenAIEmbeddings(
-            azure_endpoint=self.AZURE_OPENAI_ENDPOINT,
-            api_key=self.AZURE_OPENAI_API_KEY,
-            api_version=self.AZURE_OPENAI_API_VERSION,
-            azure_deployment=self.AZURE_OPENAI_EMBEDDING_MODEL,
-            model=self.AZURE_OPENAI_EMBEDDING_MODEL,
+            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
+            api_key=secrets.AZURE_OPENAI_API_KEY,
+            api_version=secrets.AZURE_OPENAI_API_VERSION,
+            azure_deployment=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
+            model=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
         )
 
         self.azure_search = AzureSearch(
-            azure_search_endpoint=str(self.AZURE_AI_SEARCH_ENDPOINT),
-            azure_search_key=str(self.AZURE_AI_SEARCH_API_KEY),
-            index_name=str(self.AZURE_AI_SEARCH_INDEX_NAME),
+            azure_search_endpoint=secrets.AZURE_AI_SEARCH_ENDPOINT,
+            azure_search_key=secrets.AZURE_AI_SEARCH_API_KEY,
+            index_name=secrets.AZURE_AI_SEARCH_INDEX_NAME,
             embedding_function=self.embedding_model,
             search_type="semantic_hybrid",
-            semantic_configuration_name=str(self.AZURE_AI_SEARCH_SEMANTIC_CONFIG),
-            vector_search_dimensions=int(self.AZURE_OPENAI_EMBEDDING_DIMS),
+            semantic_configuration_name=secrets.AZURE_AI_SEARCH_SEMANTIC_CONFIG,
+            vector_search_dimensions=int(secrets.AZURE_OPENAI_EMBEDDING_DIMS),
             additional_search_client_options={
-                "api_version": str(self.AZURE_AI_SEARCH_API_VERSION),
+                "api_version": secrets.AZURE_AI_SEARCH_API_VERSION,
             },
         )
 
@@ -312,13 +266,15 @@ class LangGraphProcess:
 
     async def close(self) -> None:
         """
-        Cleanup Application Runtime Resources that Performs:
+        Cleanup application runtime resources.
+
+        Responsibilities:
             - Stop Store Sweeper
             - Cleanup Store
             - Cleanup Store context manager
             - Cleanup Checkpointer
             - Cleanup Redis Client, Connection Pool
-            - Cleanup Azure AI Search Client
+            - Cleanup Azure AI Search vectorstore clients
         """
         # Cleanup Blob Client
         blob_container_client = getattr(self, "BLOB_CONTAINER_CLIENT", None)
@@ -480,15 +436,12 @@ class LangGraphProcess:
 
     def _build_graph(self, checkpointer=None, store=None):
         """
-        LangGraphProcess builder that returns the agent runnable:
-            Tools:
-                azure_ai_search_tool: RAG tool
-            Agent:
-                main_agent: main conversational react agent
-        
+        Build and return the main agent runnable.
+
         Args:
-            checkpointer: checkpoint saver Instance
-            store: data store Instance
+            checkpointer: Checkpoint saver instance
+            store: Data store instance
+
         Returns:
             Runnable: Agent runnable
         """
@@ -506,10 +459,12 @@ class LangGraphProcess:
             name="search_memory",
         )
 
-        # Create Azure AI Search Tool
+        # Create Azure AI Search retriever tool
+        if self.secrets is None:
+            raise RuntimeError("Secrets are not loaded")
         azure_ai_search = create_azure_ai_search_tool(
             azure_ai_search=self.azure_search,
-            top_k=int(self.AZURE_AI_SEARCH_TOP_K),
+            top_k=int(self.secrets.AZURE_AI_SEARCH_TOP_K),
         )
 
         # Create Tavily Search Tool
@@ -573,7 +528,7 @@ class LangGraphProcess:
             user_id: User ID
             user_query: User Query
         Yields:
-            Streamed Events (Messages, Custom Events)
+            Streamed LangGraph chunks and lifecycle events in `type/ns/data` format
         """
         
         # Logging
@@ -598,97 +553,56 @@ class LangGraphProcess:
 
         # Stream Processing
         stream = self.graph.astream(
-            inputs, 
-            config,
+            input=inputs, 
+            config=config,
             subgraphs=True,
-            stream_mode=["messages", "updates", "custom"],
+            stream_mode=["messages", "updates", "custom", "tasks"],
+            version="v2",
         )
         try:
-            async for event in stream:
-                namespace = None
-                mode = None
-                payload = None
-                data = event
-
-                # Parse Payload (namespace, data)
-                if isinstance(data, tuple) and len(data) == 2 and isinstance(data[0], tuple):
-                    namespace, data = data
-
-                # Parse Payload (mode, payload)
-                if isinstance(data, tuple) and len(data) == 2 and isinstance(data[0], str):
-                    mode, payload = data
-                elif isinstance(data, tuple) and len(data) == 3 and isinstance(data[1], str):
-                    namespace, mode, payload = data
-                elif isinstance(data, tuple) and len(data) == 2:
-                    mode, payload = "messages", data
-                elif isinstance(data, dict):
-                    mode, payload = "updates", data
-                else:
-                    mode, payload = "custom", data
-
+            async for chunk in stream:
                 # Stream Messages
-                if mode == "messages":
-
-                    STREAM_NODES = {"model"}
-
-                    # Parse Payload
-                    msg, metadata = payload, None
-                    if isinstance(payload, tuple) and len(payload) == 2:
-                        msg, metadata = payload
-
-                    # Filter AIMessageChunk
-                    if not isinstance(msg, AIMessageChunk):
-                        continue
-
-                    # Parse Node
-                    node = None
-                    if isinstance(metadata, dict):
-                        node = metadata.get("langgraph_node")
-                    
-                    # Filter Node
-                    if not node or node not in STREAM_NODES:
-                        continue
-                    
-                    # Stream Delta (text)
-                    text = getattr(msg, "text", None)
-                    if text:
-                        yield {"type": "delta", "content": text}
-                        continue
-                    
-                    # Stream Delta (str)
-                    content = getattr(msg, "content", None)
-                    if content:
-                        yield {"type": "delta", "content": str(content)}
+                if chunk["type"] == "messages":
+                    msg, metadata = chunk["data"]
+                    yield {
+                        "type": "messages",
+                        "ns": list(chunk["ns"]),
+                        "data": [
+                            message_to_dict(msg),
+                            jsonable_encoder(metadata),
+                        ],
+                    }
 
                 # Stream Updates
-                elif mode == "updates":
-                    data, metadata = payload, {}
-                    if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[1], dict):
-                        data, metadata = payload
-                    if not isinstance(data, dict):
-                        continue
-
-                    for step, patch in data.items():
-                        yield {
-                            "type": "updates",
-                            "step": step,
-                            "content": patch,
-                        }
+                elif chunk["type"] == "updates":
+                    yield {
+                        "type": "updates",
+                        "ns": list(chunk["ns"]),
+                        "data": jsonable_encoder(chunk["data"]),
+                    }
 
                 # Stream Custom
-                elif mode == "custom":
+                elif chunk["type"] == "custom":
+                    yield {
+                        "type": "custom",
+                        "ns": list(chunk["ns"]),
+                        "data": jsonable_encoder(chunk["data"]),
+                    }
 
-                    # Parse Payload
-                    data, metadata = payload, {}
-                    if isinstance(payload, tuple) and len(payload) == 2 and isinstance(payload[1], dict):
-                        data, metadata = payload
-                    
-                    # Stream Custom Event
-                    if isinstance(data, dict) and data.get("type") == "event":
-                        yield {"type": "event", "content": data.get("content", "")}
+                # Stream Tasks
+                elif chunk["type"] == "tasks":
+                    yield {
+                        "type": "tasks",
+                        "ns": list(chunk["ns"]),
+                        "data": jsonable_encoder(chunk["data"]),
+                    }
            
             # Completion Event
-            yield {"type": "complete"}
+            yield {
+                "type": "complete",
+                "ns": [],
+                "data": None
+            }
         
         # Exception Handling
         except Exception as exc:
@@ -715,7 +629,7 @@ class LangGraphProcess:
             user_query: User Query
             cancel (optional): Cancellation callable.
         Yields:
-            Streamed Events (Messages, Custom Events)
+            Streamed LangGraph chunks and lifecycle events in `type/ns/data` format
         """
         async for event in self.main(
             thread_id=thread_id,
@@ -723,7 +637,15 @@ class LangGraphProcess:
             user_query=user_query,
         ):
             if cancel is not None and await cancel():
-                yield {"type": "cancelled", "content": "Job cancelled"}
-                yield {"type": "complete"}
+                yield {
+                    "type": "cancelled",
+                    "ns": [],
+                    "data": {"message": "Job cancelled"},
+                }
+                yield {
+                    "type": "complete", 
+                    "ns": [], 
+                    "data": None
+                }
                 return
             yield event

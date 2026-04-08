@@ -94,8 +94,20 @@ Last-Event-ID: 1743500000000-0
 Response Event Payload:
 ```json
 {
-  "type": "message",
-  "content": "Hello. How can I help you?",
+  "type": "messages",
+  "ns": [],
+  "data": [
+    {
+      "type": "AIMessageChunk",
+      "data": {
+        "content": "Hello. How can I help you?"
+      }
+    },
+    {
+      "langgraph_node": "model",
+      "tags": ["seq:step:2"]
+    }
+  ],
   "event_id": "1743500000000-0"
 }
 ```

@@ -419,6 +419,7 @@ async def append_event(
     fields: dict[str, str] = {}
     for key, value in event.items():
         if value is None:
+            fields[str(key)] = "null"
             continue
         if isinstance(value, (str, int, float, bool)):
             fields[str(key)] = str(value)
@@ -484,7 +485,7 @@ async def read_events(
                     if isinstance(raw_value, bytes)
                     else str(raw_value)
                 )
-                if key in {"metadata", "payload"}:
+                if key in {"metadata", "payload", "data", "ns"}:
                     try:
                         normalized_fields[key] = json.loads(value)
                         continue

@@ -7,7 +7,6 @@ def create_azure_ai_search_tool(
     top_k: int = 3,
     search_type: str = "semantic_hybrid",
 ) -> Tool:
-    """Create a retriever-backed tool for Azure AI Search."""
     retriever = azure_ai_search.as_retriever(
         search_type=search_type,
         k=top_k,

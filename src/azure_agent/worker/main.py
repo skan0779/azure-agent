@@ -128,7 +128,7 @@ class JobWorker:
             await append_event(
                 self.redis_stream_client,
                 job_id,
-                {"type": "complete"},
+                {"type": "complete", "ns": [], "data": None},
                 ttl=self.event_ttl_seconds,
             )
             logger.info(
@@ -394,13 +394,17 @@ class JobWorker:
                 await append_event(
                     self.redis_stream_client,
                     job_id,
-                    {"type": "cancelled", "content": "Job cancelled before start"},
+                    {
+                        "type": "cancelled",
+                        "ns": [],
+                        "data": {"message": "Job cancelled before start"},
+                    },
                     ttl=self.event_ttl_seconds,
                 )
                 await append_event(
                     self.redis_stream_client,
                     job_id,
-                    {"type": "complete"},
+                    {"type": "complete", "ns": [], "data": None},
                     ttl=self.event_ttl_seconds,
                 )
                 cleanup_allowed = await self._ack_entry(stream_id)
@@ -543,7 +547,7 @@ class JobWorker:
                 await append_event(
                     self.redis_stream_client,
                     job_id,
-                    {"type": "complete"},
+                    {"type": "complete", "ns": [], "data": None},
                     ttl=self.event_ttl_seconds,
                 )
 
@@ -577,13 +581,17 @@ class JobWorker:
                     await append_event(
                         self.redis_stream_client,
                         job_id,
-                        {"type": "error", "content": str(exc)},
+                        {
+                            "type": "error",
+                            "ns": [],
+                            "data": {"message": str(exc)},
+                        },
                         ttl=self.event_ttl_seconds,
                     )
                     await append_event(
                         self.redis_stream_client,
                         job_id,
-                        {"type": "complete"},
+                        {"type": "complete", "ns": [], "data": None},
                         ttl=self.event_ttl_seconds,
                     )
                     failure_persisted = True

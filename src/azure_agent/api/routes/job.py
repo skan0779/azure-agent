@@ -425,7 +425,13 @@ async def stream_job_events(job_id: UUID, request: Request):
             return
         except Exception as exc:
             logger.warning("[job.py] Failed to stream events for %s: %s", job_id_str, exc)
-            yield sse_pack({"type": "error", "content": "Event stream error"})
+            yield sse_pack(
+                {
+                    "type": "error",
+                    "ns": [],
+                    "data": {"message": "Event stream error"},
+                }
+            )
 
     return StreamingResponse(
         gen(),
