@@ -82,18 +82,18 @@
 
 | Category | Library | Resource |
 | --- | --- | --- |
-| Job Queue & Worker | --- | Azure Managed Redis (OSS) |
-| Session Management | --- | Azure Managed Redis (OSS) |
+| Job Queue & Worker | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
+| Session Management | Custom `SessionManager` | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
 | Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | --- |
-| Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
+| Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [Langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Prompt Management | --- | Azure Blob Storage |
 | Response Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
-| Safety & Guardrails | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware), [AzureAIContentSafety](https://learn.microsoft.com/en-us/azure/ai-services/content-safety) | Azure AI Content Safety |
-| Secret Management  | --- | Azure Key Vault |
+| Safety & Guardrails | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware), [AzureAIContentSafety](https://github.com/Azure-Samples/AzureAIContentSafety) | Azure AI Content Safety |
+| Secret Management  | [azure-sdk](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
 | Rate Limiting | --- | --- |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | --- |
 | Client Interface | --- | --- |
