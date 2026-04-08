@@ -84,7 +84,7 @@
 | Category | Library | Resource |
 | --- | --- | --- |
 | Job Queue & Worker | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
-| Session Management | Custom `SessionManager` | Azure Managed Redis (OSS) |
+| Session Management | [Custom SessionManager](./src/azure_agent/session/README.md) | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
 | Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | - |
