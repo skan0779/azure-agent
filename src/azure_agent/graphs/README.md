@@ -30,6 +30,7 @@
 > Stream LangGraph chunks and lifecycle events in a raw-friendly `type/ns/data` envelope
 
 SSE Payload shapes:
+
 `custom`
 ```json
 {

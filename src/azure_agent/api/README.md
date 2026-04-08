@@ -222,5 +222,5 @@ Errors:
 ## 4. Swagger
 > Local API inspection and docs
 
-- OpenAPI JSON: `/agent/openapi.json`
-- Swagger UI: `/agent/swagger`
+OpenAPI JSON: `/agent/openapi.json`
+Swagger UI: `/agent/swagger`
