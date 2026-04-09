@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2563EB.svg" alt="License"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2563EB.svg" alt="License"></a>
   <a href="https://github.com/skan0779/azure-agent/stargazers" target="_blank"><img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat&color=1D4ED8" alt="GitHub Stars"></a>
   <a href="https://www.python.org/" target="_blank"><img src="https://img.shields.io/badge/Python-306998?logo=python&logoColor=white" alt="Python"></a>
   <img src="https://img.shields.io/badge/LangGraph-1F2937?logo=langchain&logoColor=white" alt="LangGraph">
@@ -113,6 +113,6 @@ not yet
 ---
 
 ## License
-> This project is licensed under the MIT License. See `LICENSE` for details.
+> This project is licensed under the `Apache License 2.0`. See `LICENSE` for details.
 
 Bundled `Swagger UI assets` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
