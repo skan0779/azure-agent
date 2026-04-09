@@ -113,6 +113,6 @@ not yet
 ---
 
 ## License
-> This project is licensed under the `Apache License 2.0`. See `LICENSE` for details.
+> This project is licensed under the `Apache License 2.0`. See [LICENSE](./LICENSE) for details.
 
 Bundled `Swagger UI assets` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
