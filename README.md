@@ -83,9 +83,9 @@ uv run python examples/azure_ai_search/create_document.py
 - [`README.md`](./src/azure_agent/api/README.md)
 
 ### 9. Check Swagger & Status
-- https://<application-url>/agent/api/ping
-- https://<application-url>/agent/api/health
-- https://<application-url>/agent/swagger
+- `https://<application-url>/agent/api/ping`
+- `https://<application-url>/agent/api/health`
+- `https://<application-url>/agent/swagger`
 
 ---
 
