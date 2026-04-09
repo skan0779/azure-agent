@@ -485,6 +485,22 @@ class LangGraphProcess:
             topic="general"
         )
         
+        # Create Azure Web Search Tool (Grounding with Bing Search)
+        web_search = {
+            "type": "web_search",
+            "user_location": {
+                "type": "approximate",
+                "country": "KR",
+            },
+            # "filters": {
+            #     "allowed_domains": [
+            #         "www.who.int",
+            #         "www.cdc.gov",
+            #         "www.fda.gov"
+            #     ]
+            # }
+        }
+
         # Create Main Agent
         main_agent = create_agent(
             model=self.main_model,
@@ -492,7 +508,8 @@ class LangGraphProcess:
                 manage_memory,          # LangMem
                 search_memory,          # LangMem
                 azure_ai_search,        # RAG
-                tavily_search,          # Web Search
+                web_search,             # Web Search
+                # tavily_search,          # Web Search
             ],
             system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
