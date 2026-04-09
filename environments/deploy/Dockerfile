@@ -14,8 +14,8 @@ RUN useradd -m -u 1000 appuser
 # Copy dependency files and package source
 COPY pyproject.toml uv.lock ./
 COPY src ./src
-COPY README.md ./
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app/src"
 
 # Install Python dependencies and the local package
 RUN uv sync --frozen --no-editable \
@@ -34,8 +34,8 @@ EXPOSE 8080
 # Default log level
 ENV LOG_LEVEL=info
 
-# Run Gunicorn via uv (Uvicorn worker)
-CMD ["sh","-lc","uv run gunicorn azure_agent.api.main:app \
+# Run Gunicorn via the project interpreter to avoid script path issues
+CMD ["sh","-lc","uv run --no-sync python -m gunicorn azure_agent.api.main:app \
   -k uvicorn.workers.UvicornWorker \
   --access-logfile - \
   --error-logfile - \

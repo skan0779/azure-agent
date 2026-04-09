@@ -41,9 +41,9 @@ class AppSecrets:
     TAVILY_API_KEY: str
     # Tiktoken
     TIKTOKEN_ENCODER: str
-    # Azure AI Content Safety (optional)
-    AZURE_AI_CONTENT_SAFETY_ENDPOINT: str = ""
-    AZURE_AI_CONTENT_SAFETY_API_KEY: str = ""
+    # Azure AI Content Safety
+    AZURE_AI_CONTENT_SAFETY_ENDPOINT: str
+    AZURE_AI_CONTENT_SAFETY_API_KEY: str
 
 
 async def load_app_secrets(secret_client: SecretClient) -> AppSecrets:

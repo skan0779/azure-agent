@@ -485,22 +485,6 @@ class LangGraphProcess:
             topic="general"
         )
         
-        # Create Azure Web Search Tool (Grounding with Bing Search)
-        web_search = {
-            "type": "web_search",
-            "user_location": {
-                "type": "approximate",
-                "country": "KR",
-            },
-            # "filters": {
-            #     "allowed_domains": [
-            #         "www.who.int",
-            #         "www.cdc.gov",
-            #         "www.fda.gov"
-            #     ]
-            # }
-        }
-
         # Create Main Agent
         main_agent = create_agent(
             model=self.main_model,
@@ -508,8 +492,7 @@ class LangGraphProcess:
                 manage_memory,          # LangMem
                 search_memory,          # LangMem
                 azure_ai_search,        # RAG
-                web_search,             # Web Search
-                # tavily_search,          # Web Search
+                tavily_search,          # Web Search
             ],
             system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
@@ -540,7 +523,7 @@ class LangGraphProcess:
                     endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
                     credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
                     categories=["Hate", "SelfHarm", "Sexual", "Violence"],
-                    severity_threshold=4,
+                    severity_threshold=5,
                     exit_behavior="error",
                 ),
                 AzurePromptShieldMiddleware(
@@ -599,7 +582,12 @@ class LangGraphProcess:
             input=inputs, 
             config=config,
             subgraphs=True,
-            stream_mode=["messages", "updates", "custom", "tasks"],
+            stream_mode=[
+                "messages", 
+                "updates", 
+                "custom", 
+                # "tasks"
+            ],
             version="v2",
         )
         try:

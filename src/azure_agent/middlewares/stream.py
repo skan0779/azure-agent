@@ -11,8 +11,7 @@ from azure_agent.graphs.schema import AgentState
 async def event_stream_before_agent(state: AgentState, runtime: Runtime) -> None:
     '''Custom middleware to stream custom events before starting agent'''
 
-    agent_type = state.get("agent_type")
-    runtime.stream_writer({"type": "event", "content": f"Starting {agent_type} ..."})
+    runtime.stream_writer({"type": "event", "content": f"Starting agent ..."})
 
 
 @before_model

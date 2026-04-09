@@ -5,7 +5,7 @@
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Production-ready Enterprise AI Chatbot Template for Microsoft Azure
+  Production-ready Enterprise AI Chat Agent Template for Microsoft Azure
 </p>
 
 <p align="center">
@@ -45,7 +45,13 @@
 
 ### 2. Create an Azure AI Search index
 - Create the index schema
+```bash
+uv run python examples/azure_ai_search/create_index.py
+```
 - Upload index documents
+```bash
+uv run python examples/azure_ai_search/create_document.py
+```
 - [`README.md`](./examples/azure_ai_search/README.md)
 
 ### 3. Create an [Tavily](https://www.tavily.com/) account (optional)
@@ -72,14 +78,19 @@
 
 ### 8. Configure an Azure Container Apps
 - Enable a Managed Identity
-- Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`
+- Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`
 - Set environment variables from [`.env.example`](./environments/env/.env.example)
 - [`README.md`](./src/azure_agent/api/README.md)
+
+### 9. Check Swagger & Status
+- https://<application-url>/agent/api/ping
+- https://<application-url>/agent/api/health
+- https://<application-url>/agent/swagger
 
 ---
 
 ## Agent Feature & Checklist
-> Stateful, Async, Production-oriented Azure AI Agent Stack for Enterprise workloads on Microsoft Azure.
+> AI Agent Stack for Enterprise workloads on Microsoft Azure
 
 | Category | Library | Resource |
 | --- | --- | --- |
@@ -87,7 +98,7 @@
 | Session Management | [Session Manager(Custom)](./src/azure_agent/session/README.md) | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
-| Web Search | [Web Search(Grounding with Bing Search)](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI |
+| Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | - |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [Langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
@@ -100,7 +111,6 @@
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
 | Client Interface | - | - |
 
-<!-- | Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | - | -->
 <!-- | Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - | -->
 
 ---
