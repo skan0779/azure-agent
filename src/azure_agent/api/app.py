@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
 
 from azure_agent.api.routes.health import router as health_router
@@ -17,6 +18,28 @@ from azure_agent.infra.redis import close_redis_client, create_redis_stream_clie
 from azure_agent.session import SessionManager
 
 logger = logging.getLogger(__name__)
+
+OPENAPI_TAGS = [
+    {
+        "name": "Ping",
+        "description": "Liveness endpoint for simple process reachability checks.",
+    },
+    {
+        "name": "Health",
+        "description": "Readiness endpoint for runtime dependencies such as Redis and session management.",
+    },
+    {
+        "name": "Jobs",
+        "description": (
+            "Asynchronous job APIs. All job endpoints require the `X-User-Id` header. "
+            "Use `POST /agent/api/jobs` to enqueue work, `GET /agent/api/jobs/{job_id}` to "
+            "poll state, `GET /agent/api/jobs/{job_id}/events` to stream SSE events, and "
+            "`POST /agent/api/jobs/{job_id}/cancel` to request cancellation."
+        ),
+    },
+]
+
+JOB_PATH_PREFIX = "/agent/api/jobs"
 
 logging.basicConfig(
     level="INFO",
@@ -74,20 +97,66 @@ def create_app() -> FastAPI:
     Create FastAPI application instance
 
     API Endpoints:
-        - /agent/ping: Health check endpoint
-        - /agent/jobs: Async job endpoints
+        - /agent/api/ping: Liveness endpoint
+        - /agent/api/health: Readiness endpoint
+        - /agent/api/jobs: Async job endpoints
+        - /agent/swagger: Swagger UI
+        - /agent/openapi.json: OpenAPI schema
     """
 
     # FastAPI Instance
     app = FastAPI(
         title="Azure Agent API",
         version="0.1.0",
+        description=(
+            "Asynchronous job API for the Azure Agent service.\n\n"
+            "Authentication model:\n"
+            "- Job endpoints require the `X-User-Id` header.\n"
+            "- `thread_id` ownership is enforced per user.\n\n"
+            "Streaming model:\n"
+            "- `GET /agent/api/jobs/{job_id}/events` returns `text/event-stream`.\n"
+            "- Resume interrupted streams with the `Last-Event-ID` header."
+        ),
         lifespan=lifespan,
         docs_url=None,
         openapi_url="/agent/openapi.json",
         redoc_url=None,
         swagger_ui_oauth2_redirect_url="/agent/swagger/oauth2-redirect",
+        openapi_tags=OPENAPI_TAGS,
     )
+
+    def custom_openapi():
+        if app.openapi_schema:
+            return app.openapi_schema
+
+        schema = get_openapi(
+            title=app.title,
+            version=app.version,
+            description=app.description,
+            routes=app.routes,
+            tags=OPENAPI_TAGS,
+        )
+
+        for path, path_item in schema.get("paths", {}).items():
+            if not path.startswith(JOB_PATH_PREFIX):
+                continue
+            for operation in path_item.values():
+                if not isinstance(operation, dict):
+                    continue
+                for parameter in operation.get("parameters", []):
+                    if parameter.get("in") == "header" and parameter.get("name") == "X-User-Id":
+                        parameter["required"] = True
+                        parameter["schema"] = {
+                            "type": "string",
+                            "title": "X-User-Id",
+                            "description": parameter.get("description", ""),
+                            "examples": ["user-123"],
+                        }
+
+        app.openapi_schema = schema
+        return app.openapi_schema
+
+    app.openapi = custom_openapi
 
     # Swagger UI (Static Files)
     static_dir = Path(__file__).resolve().parent / "static"

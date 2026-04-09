@@ -85,7 +85,9 @@ uv run python examples/azure_ai_search/create_document.py
 ### 9. Check Swagger & Status
 - `https://<application-url>/agent/api/ping`
 - `https://<application-url>/agent/api/health`
+- `https://<application-url>/agent/openapi.json`
 - `https://<application-url>/agent/swagger`
+- Use `X-User-Id` when testing the `Jobs` endpoints in Swagger.
 
 ---
 

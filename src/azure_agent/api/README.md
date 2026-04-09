@@ -17,6 +17,8 @@
 - `Redis Stream` for job queueing and SSE event replay
 - `SessionManager` for per-`thread_id` runtime coordination
 - `Worker` for background job execution
+- `X-User-Id` header required for all job endpoints
+- `Last-Event-ID` header supported for SSE replay on the events endpoint
 
 ---
 
@@ -59,9 +61,9 @@ Response:
 {
   "job_id": "44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6",
   "status": "queued",
-  "status_url": "/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6",
-  "events_url": "/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6/events",
-  "cancel_url": "/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6/cancel"
+  "status_url": "https://api.example.com/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6",
+  "events_url": "https://api.example.com/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6/events",
+  "cancel_url": "https://api.example.com/agent/api/jobs/44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6/cancel"
 }
 ```
 
@@ -215,7 +217,7 @@ Response:
 Errors:
 | Status | Code | Detail |
 | --- | --- | --- |
-| `503` | `service_unavailable` | one or more readiness checks failed |
+| `503` | - | one or more readiness checks failed (response body remains the `HealthResponse` schema) |
 
 ---
 

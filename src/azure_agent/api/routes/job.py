@@ -1,13 +1,14 @@
 import asyncio, json, logging
 from datetime import datetime
 from time import monotonic
-from typing import AsyncGenerator
+from typing import Annotated, AsyncGenerator
 from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from azure_agent.api.schema import (
+    ErrorResponse,
     JobCancelResponse,
     JobCreateRequest,
     JobCreateResponse,
@@ -31,8 +32,17 @@ def sse_pack(event: dict) -> str:
     return f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
 
 
-def get_request_user_id(request: Request) -> str:
-    user_id = str(request.headers.get("X-User-Id", "")).strip()
+def get_request_user_id(
+    x_user_id: Annotated[
+        str | None,
+        Header(
+            alias="X-User-Id",
+            description="Caller identity used for job ownership checks. Required on all job endpoints.",
+            examples=["user-123"],
+        ),
+    ] = None,
+) -> str:
+    user_id = str(x_user_id or "").strip()
     if not user_id:
         raise HTTPException(
             status_code=401,
@@ -70,13 +80,45 @@ def build_job_create_response(request: Request, *, job_id: str, status: str) -> 
     response_model=JobCreateResponse,
     status_code=202,
     tags=["Jobs"],
+    summary="Create job",
+    description=(
+        "Creates or reuses an asynchronous job for the supplied `thread_id`. "
+        "If `idempotency_key` is provided and matches an existing request owned by the same "
+        "user and thread, the existing job is returned."
+    ),
+    response_description="Accepted job descriptor including polling, events, and cancel URLs.",
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "description": "Missing or empty `X-User-Id` header.",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "The thread is already owned by another user.",
+        },
+        409: {
+            "model": ErrorResponse,
+            "description": "The request conflicts with the current session or idempotency state.",
+        },
+        500: {
+            "model": ErrorResponse,
+            "description": "The API could not complete the request because a required dependency is unavailable or invalid.",
+        },
+        503: {
+            "model": ErrorResponse,
+            "description": "The service is temporarily unable to enqueue or execute the request.",
+        },
+    },
 )
-async def create_job_endpoint(req: JobCreateRequest, request: Request):
+async def create_job_endpoint(
+    req: JobCreateRequest,
+    request: Request,
+    request_user_id: Annotated[str, Depends(get_request_user_id)],
+):
     redis_client = getattr(request.app.state, "redis_stream_client", None)
     session_manager: SessionManager | None = getattr(request.app.state, "session_manager", None)
     runtime_config = getattr(request.app.state, "runtime_config", None)
     reservation_id: str | None = None
-    request_user_id = get_request_user_id(request)
     thread_id = str(req.thread_id)
     if redis_client is None:
         raise HTTPException(status_code=500, detail="Redis stream client unavailable")
@@ -306,12 +348,36 @@ async def create_job_endpoint(req: JobCreateRequest, request: Request):
     "/agent/api/jobs/{job_id}",
     response_model=JobStatusResponse,
     tags=["Jobs"],
+    summary="Get job status",
+    description="Returns the current state and timestamps for a single job.",
+    response_description="Current persisted job state.",
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "description": "Missing or empty `X-User-Id` header.",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "The requested job belongs to another user.",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "The requested job does not exist.",
+        },
+        500: {
+            "model": ErrorResponse,
+            "description": "The API could not complete the request because a required dependency is unavailable or invalid.",
+        },
+    },
 )
-async def get_job_endpoint(job_id: UUID, request: Request):
+async def get_job_endpoint(
+    job_id: UUID,
+    request: Request,
+    request_user_id: Annotated[str, Depends(get_request_user_id)],
+):
     redis_client = getattr(request.app.state, "redis_stream_client", None)
     if redis_client is None:
         raise HTTPException(status_code=500, detail="Redis stream client unavailable")
-    request_user_id = get_request_user_id(request)
     job_id_str = str(job_id)
     job = await get_job(redis_client, job_id_str)
     if job is None:
@@ -347,15 +413,61 @@ async def get_job_endpoint(job_id: UUID, request: Request):
     "/agent/api/jobs/{job_id}/events",
     response_class=StreamingResponse,
     tags=["Jobs"],
+    summary="Stream job events",
+    description=(
+        "Streams job output as Server-Sent Events (`text/event-stream`). "
+        "Use the optional `Last-Event-ID` header to resume after a disconnected stream."
+    ),
+    response_description="SSE stream containing job events, keep-alive pings, and a terminal complete event.",
+    responses={
+        200: {
+            "description": "SSE event stream for the requested job.",
+            "content": {
+                "text/event-stream": {
+                    "example": (
+                        'data: {"type":"messages","ns":[],"data":[{"type":"AIMessageChunk",'
+                        '"data":{"content":"Hello. How can I help you?"}}],"event_id":"1743500000000-0"}\n\n'
+                    ),
+                }
+            },
+        },
+        401: {
+            "model": ErrorResponse,
+            "description": "Missing or empty `X-User-Id` header.",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "The requested job belongs to another user.",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "The requested job does not exist.",
+        },
+        500: {
+            "model": ErrorResponse,
+            "description": "The API could not complete the request because a required dependency is unavailable or invalid.",
+        },
+    },
 )
-async def stream_job_events(job_id: UUID, request: Request):
+async def stream_job_events(
+    job_id: UUID,
+    request: Request,
+    request_user_id: Annotated[str, Depends(get_request_user_id)],
+    last_event_id: Annotated[
+        str | None,
+        Header(
+            alias="Last-Event-ID",
+            description="Optional SSE resume token. Send the last received event id to continue an interrupted stream.",
+            examples=["1743500000000-0"],
+        ),
+    ] = None,
+):
     redis_client = getattr(request.app.state, "redis_stream_client", None)
     runtime_config = getattr(request.app.state, "runtime_config", None)
     if redis_client is None:
         raise HTTPException(status_code=500, detail="Redis stream client unavailable")
     if runtime_config is None:
         raise HTTPException(status_code=500, detail="Runtime config unavailable")
-    request_user_id = get_request_user_id(request)
     job_id_str = str(job_id)
     job = await get_job(redis_client, job_id_str)
     if job is None:
@@ -363,7 +475,7 @@ async def stream_job_events(job_id: UUID, request: Request):
     validate_job_owner(job, request_user_id)
 
     async def gen() -> AsyncGenerator[str, None]:
-        last_id = request.headers.get("last-event-id") or "0-0"
+        last_id = last_event_id or "0-0"
         started_at = monotonic()
         max_connection_seconds = runtime_config.api.sse_max_connection_seconds
         try:
@@ -448,15 +560,39 @@ async def stream_job_events(job_id: UUID, request: Request):
     "/agent/api/jobs/{job_id}/cancel",
     response_model=JobCancelResponse,
     tags=["Jobs"],
+    summary="Cancel job",
+    description="Requests cancellation for a queued or running job owned by the caller.",
+    response_description="Cancellation request result.",
+    responses={
+        401: {
+            "model": ErrorResponse,
+            "description": "Missing or empty `X-User-Id` header.",
+        },
+        403: {
+            "model": ErrorResponse,
+            "description": "The requested job belongs to another user.",
+        },
+        404: {
+            "model": ErrorResponse,
+            "description": "The requested job does not exist.",
+        },
+        500: {
+            "model": ErrorResponse,
+            "description": "The API could not complete the request because a required dependency is unavailable or invalid.",
+        },
+    },
 )
-async def cancel_job_endpoint(job_id: UUID, request: Request):
+async def cancel_job_endpoint(
+    job_id: UUID,
+    request: Request,
+    request_user_id: Annotated[str, Depends(get_request_user_id)],
+):
     redis_client = getattr(request.app.state, "redis_stream_client", None)
     runtime_config = getattr(request.app.state, "runtime_config", None)
     if redis_client is None:
         raise HTTPException(status_code=500, detail="Redis stream client unavailable")
     if runtime_config is None:
         raise HTTPException(status_code=500, detail="Runtime config unavailable")
-    request_user_id = get_request_user_id(request)
     job_id_str = str(job_id)
     job = await get_job(redis_client, job_id_str)
     if job is None:

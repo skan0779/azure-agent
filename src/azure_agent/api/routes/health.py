@@ -10,7 +10,23 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.get("/agent/api/health", response_model=HealthResponse, tags=["Health"])
+@router.get(
+    "/agent/api/health",
+    response_model=HealthResponse,
+    tags=["Health"],
+    summary="Readiness check",
+    description=(
+        "Validates that the runtime configuration, Redis stream client, session manager, "
+        "and Redis ping are all available."
+    ),
+    response_description="Readiness result and dependency check map.",
+    responses={
+        503: {
+            "model": HealthResponse,
+            "description": "One or more readiness checks failed.",
+        }
+    },
+)
 async def health(request: Request):
     redis_client = getattr(request.app.state, "redis_stream_client", None)
     session_manager = getattr(request.app.state, "session_manager", None)
