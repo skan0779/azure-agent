@@ -26,6 +26,7 @@ Copy Deployment token:
 Azure Portal -> Static Web App -> Manage deployment token
 
 Add New Repository secret:
-Settings -> Secrets and Variables -> Actions
-- AZURE_STATIC_WEB_APPS_API_TOKEN: SWA deployment token
-- NEXT_PUBLIC_AGENT_WEB_URL: azure-agent-web application url
+Settings -> Secrets and Variables -> Actions -> Secrets -> AZURE_STATIC_WEB_APPS_API_TOKEN: SWA deployment token
+
+Add New Repository variables:
+Settings -> Secrets and Variables -> Actions -> Variables -> NEXT_PUBLIC_AGENT_WEB_URL: azure-agent-web application url
