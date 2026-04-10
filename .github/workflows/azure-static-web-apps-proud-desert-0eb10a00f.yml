@@ -22,6 +22,20 @@ jobs:
         with:
           submodules: true
           lfs: false
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build azure-agent-ui
+        run: pnpm --dir apps/azure-agent-ui build
+        env:
+          NEXT_PUBLIC_AGENT_WEB_URL: ${{ vars.NEXT_PUBLIC_AGENT_WEB_URL }}
+          IS_STATIC_EXPORT: true
       - name: Install OIDC Client from Core Package
         run: npm install @actions/core@1.6.0 @actions/http-client
       - name: Get Id Token
@@ -38,6 +52,7 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROUD_DESERT_0EB10A00F }}
           action: "upload"
+          skip_app_build: true
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
           # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "apps/azure-agent-ui" # App source code path
