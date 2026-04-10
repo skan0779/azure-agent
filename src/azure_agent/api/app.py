@@ -19,26 +19,6 @@ from azure_agent.session import SessionManager
 
 logger = logging.getLogger(__name__)
 
-OPENAPI_TAGS = [
-    {
-        "name": "Ping",
-        "description": "Liveness endpoint for simple process reachability checks.",
-    },
-    {
-        "name": "Health",
-        "description": "Readiness endpoint for runtime dependencies such as Redis and session management.",
-    },
-    {
-        "name": "Jobs",
-        "description": (
-            "Asynchronous job APIs. All job endpoints require the `X-User-Id` header. "
-            "Use `POST /agent/api/jobs` to enqueue work, `GET /agent/api/jobs/{job_id}` to "
-            "poll state, `GET /agent/api/jobs/{job_id}/events` to stream SSE events, and "
-            "`POST /agent/api/jobs/{job_id}/cancel` to request cancellation."
-        ),
-    },
-]
-
 JOB_PATH_PREFIX = "/agent/api/jobs"
 
 logging.basicConfig(
@@ -94,35 +74,23 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     """
-    Create FastAPI application instance
-
-    API Endpoints:
+    Create FastAPI application instance, API Endpoints:
         - /agent/api/ping: Liveness endpoint
         - /agent/api/health: Readiness endpoint
         - /agent/api/jobs: Async job endpoints
         - /agent/swagger: Swagger UI
         - /agent/openapi.json: OpenAPI schema
     """
-
     # FastAPI Instance
     app = FastAPI(
         title="Azure Agent API",
         version="0.1.0",
-        description=(
-            "Asynchronous job API for the Azure Agent service.\n\n"
-            "Authentication model:\n"
-            "- Job endpoints require the `X-User-Id` header.\n"
-            "- `thread_id` ownership is enforced per user.\n\n"
-            "Streaming model:\n"
-            "- `GET /agent/api/jobs/{job_id}/events` returns `text/event-stream`.\n"
-            "- Resume interrupted streams with the `Last-Event-ID` header."
-        ),
+        description="Production-ready Enterprise AI Chat Agent Template for Microsoft Azure",
         lifespan=lifespan,
         docs_url=None,
         openapi_url="/agent/openapi.json",
         redoc_url=None,
         swagger_ui_oauth2_redirect_url="/agent/swagger/oauth2-redirect",
-        openapi_tags=OPENAPI_TAGS,
     )
 
     def custom_openapi():
@@ -134,7 +102,6 @@ def create_app() -> FastAPI:
             version=app.version,
             description=app.description,
             routes=app.routes,
-            tags=OPENAPI_TAGS,
         )
 
         for path, path_item in schema.get("paths", {}).items():

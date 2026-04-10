@@ -586,7 +586,7 @@ class LangGraphProcess:
                 "messages", 
                 "updates", 
                 "custom", 
-                # "tasks"
+                "tasks" # optional
             ],
             version="v2",
         )
