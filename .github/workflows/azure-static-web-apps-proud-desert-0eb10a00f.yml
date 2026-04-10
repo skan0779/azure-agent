@@ -36,11 +36,19 @@ jobs:
         env:
           NEXT_PUBLIC_AGENT_WEB_URL: ${{ vars.NEXT_PUBLIC_AGENT_WEB_URL }}
           IS_STATIC_EXPORT: true
+      - name: Get GitHub OIDC token
+        id: idtoken
+        shell: bash
+        run: |
+          RESPONSE="$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=api://AzureStaticWebApps")"
+          TOKEN="$(python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["value"])' <<<"$RESPONSE")"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
       - name: Build And Deploy
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROUD_DESERT_0EB10A00F }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
           skip_app_build: true
           ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
@@ -48,6 +56,7 @@ jobs:
           app_location: "apps/azure-agent-ui" # App source code path
           api_location: "" # Api source code path - optional
           output_location: "out" # Built app content directory - optional
+          github_id_token: ${{ steps.idtoken.outputs.token }}
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
