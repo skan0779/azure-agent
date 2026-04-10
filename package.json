@@ -1,0 +1,8 @@
+{
+  "name": "azure-agent-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.0.0",
+  "workspaces": [
+    "apps/*"
+  ]
+}

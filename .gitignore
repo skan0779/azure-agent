@@ -1,5 +1,9 @@
-# Temporary files
-
+# UI
+node_modules/
+.pnpm-store/
+.next/
+dist/
+.turbo/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

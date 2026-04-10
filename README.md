@@ -40,6 +40,8 @@
 | Azure Container Apps Environment | - |
 | Azure Container Apps | Deploy `azure-agent-api` service |
 | Azure Container Apps | Deploy `azure-agent-worker` service |
+| Azure Container Apps | Deploy `azure-agent-web` service |
+| Azure Static Web Apps | Deploy `azure-agent-ui` service |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 
@@ -109,7 +111,7 @@ uv run python examples/azure_ai_search/create_document.py
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
 | Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
-| Client Interface | - | - |
+| UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | Azure Static Web Apps  |
 
 <!-- | Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - | -->
 
