@@ -31,6 +31,15 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Validate agent web URL
+        run: |
+          if [ -z "${NEXT_PUBLIC_AGENT_WEB_URL}" ]; then
+            echo "NEXT_PUBLIC_AGENT_WEB_URL is not set"
+            exit 1
+          fi
+          echo "NEXT_PUBLIC_AGENT_WEB_URL=${NEXT_PUBLIC_AGENT_WEB_URL}"
+        env:
+          NEXT_PUBLIC_AGENT_WEB_URL: ${{ vars.NEXT_PUBLIC_AGENT_WEB_URL }}
       - name: Build azure-agent-ui
         run: pnpm --dir apps/azure-agent-ui build
         env:
