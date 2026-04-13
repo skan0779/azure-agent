@@ -1,59 +1,31 @@
 "use client";
 
-import {
-  startTransition,
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { startTransition, useCallback, useEffect, useState } from "react";
+import { Bot } from "lucide-react";
 
 import { Assistant } from "@/app/assistant";
-import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
-  type ChatSession,
-  createChatSession,
-  loadActiveChatId,
-  loadSessions,
+  createThreadId,
+  loadThreadId,
   loadUserId,
-  saveActiveChatId,
-  saveSessions,
+  saveThreadId,
   saveUserId,
 } from "@/lib/chat-storage";
-
-const ensureSessions = (
-  sessions: ChatSession[],
-  activeChatId: string | null,
-): { sessions: ChatSession[]; activeChatId: string } => {
-  const normalized = sessions.length > 0 ? sessions : [createChatSession()];
-  const fallbackId = normalized[0]!.id;
-  const nextActiveChatId =
-    activeChatId && normalized.some((session) => session.id === activeChatId)
-      ? activeChatId
-      : fallbackId;
-
-  return {
-    sessions: normalized,
-    activeChatId: nextActiveChatId,
-  };
-};
 
 export function ChatShell() {
   const [isReady, setIsReady] = useState(false);
   const [userId, setUserId] = useState("");
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
-  const [activeChatId, setActiveChatId] = useState("");
+  const [threadId, setThreadId] = useState("");
 
   useEffect(() => {
     const storedUserId = loadUserId();
-    const storedSessions = loadSessions();
-    const storedActiveChatId = loadActiveChatId();
-    const nextState = ensureSessions(storedSessions, storedActiveChatId);
+    const storedThreadId = loadThreadId() ?? createThreadId();
 
     startTransition(() => {
       setUserId(storedUserId);
-      setSessions(nextState.sessions);
-      setActiveChatId(nextState.activeChatId);
+      setThreadId(storedThreadId);
       setIsReady(true);
     });
   }, []);
@@ -67,82 +39,73 @@ export function ChatShell() {
   }, [isReady, userId]);
 
   useEffect(() => {
-    if (!isReady) {
+    if (!isReady || !threadId) {
       return;
     }
 
-    saveSessions(sessions);
-  }, [isReady, sessions]);
-
-  useEffect(() => {
-    if (!isReady || !activeChatId) {
-      return;
-    }
-
-    saveActiveChatId(activeChatId);
-  }, [activeChatId, isReady]);
+    saveThreadId(threadId);
+  }, [isReady, threadId]);
 
   const handleNewChat = useCallback(() => {
-    const session = createChatSession();
-
-    setSessions((current) => [session, ...current]);
-    setActiveChatId(session.id);
+    setThreadId(createThreadId());
   }, []);
 
-  const handleSelectChat = useCallback((chatId: string) => {
-    setActiveChatId(chatId);
-  }, []);
-
-  const handleSessionTouched = useCallback((chatId: string, titleHint?: string) => {
-    setSessions((current) => {
-      return current.map((session) => {
-        if (session.id !== chatId) {
-          return session;
-        }
-
-        const normalizedTitle =
-          titleHint?.trim() ||
-          (session.title === "New Chat" ? session.title : session.title);
-
-        return {
-          ...session,
-          title:
-            session.title === "New Chat" && normalizedTitle !== "New Chat"
-              ? normalizedTitle
-              : session.title,
-          updatedAt: new Date().toISOString(),
-        };
-      });
-    });
-  }, []);
-
-  const sidebarSessions = useMemo(() => {
-    return [...sessions].sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
-    );
-  }, [sessions]);
-
-  if (!isReady || !activeChatId) {
+  if (!isReady || !threadId) {
     return null;
   }
 
   return (
-    <div className="flex h-dvh bg-background">
-      <ThreadListSidebar
-        activeChatId={activeChatId}
-        sessions={sidebarSessions}
-        userId={userId}
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-        onUserIdChange={setUserId}
-      />
-      <main className="min-w-0 flex-1">
-        <Assistant
-          key={activeChatId}
-          chatId={activeChatId}
-          userId={userId}
-          onSessionTouched={handleSessionTouched}
-        />
+    <div className="flex h-dvh flex-col bg-background">
+      <header className="border-b bg-muted/20 px-4 py-4">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-foreground text-background">
+              <Bot className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold">Azure Agent</p>
+              <p className="text-xs text-muted-foreground">
+                assistant-ui thread client
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-3 md:flex-row md:items-center">
+            <div className="min-w-0 md:w-72">
+              <label
+                htmlFor="dev-user-id"
+                className="mb-2 block text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground"
+              >
+                Dev User ID
+              </label>
+              <Input
+                id="dev-user-id"
+                value={userId}
+                onChange={(event) => setUserId(event.target.value)}
+                placeholder="user-123"
+                autoComplete="off"
+              />
+            </div>
+
+            <div className="min-w-0 md:w-80">
+              <label
+                htmlFor="thread-id"
+                className="mb-2 block text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground"
+              >
+                Thread ID
+              </label>
+              <Input id="thread-id" value={threadId} readOnly />
+            </div>
+
+            <div className="pt-0 md:self-end">
+              <Button onClick={handleNewChat}>New Chat</Button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="min-h-0 flex-1">
+        <Assistant threadId={threadId} userId={userId} />
       </main>
     </div>
   );
