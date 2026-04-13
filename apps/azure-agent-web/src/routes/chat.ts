@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import {
   cancelAgentJob,
+  cancelAgentJobById,
   createAgentJob,
   type AgentJobCreateResponse,
   streamAgentEvents,
@@ -23,6 +24,11 @@ const chatBodySchema = z.object({
   trigger: z.string().optional(),
 });
 
+const cancelBodySchema = z.object({
+  jobId: z.string().min(1),
+  userId: z.string().min(1).optional(),
+});
+
 const isAbortError = (error: unknown): boolean => {
   return (
     error instanceof Error &&
@@ -32,6 +38,38 @@ const isAbortError = (error: unknown): boolean => {
 };
 
 export const chatRoutes: FastifyPluginAsync = async (app) => {
+  app.post("/api/chat/cancel", async (request, reply) => {
+    const parsed = cancelBodySchema.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return {
+        error: "invalid_request",
+        detail: parsed.error.flatten(),
+      };
+    }
+
+    const headerUserId =
+      typeof request.headers["x-user-id"] === "string"
+        ? request.headers["x-user-id"]
+        : undefined;
+    const resolvedUserId =
+      parsed.data.userId?.trim() ||
+      headerUserId?.trim() ||
+      config.defaultUserId;
+
+    await cancelAgentJobById({
+      baseUrl: config.agentApiBaseUrl,
+      jobId: parsed.data.jobId,
+      userId: resolvedUserId,
+    });
+
+    return {
+      ok: true,
+      jobId: parsed.data.jobId,
+      userId: resolvedUserId,
+    };
+  });
+
   app.post("/api/chat", async (request, reply) => {
     const parsed = chatBodySchema.safeParse(request.body);
     if (!parsed.success) {
@@ -140,8 +178,19 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
             },
           });
 
+          writer.write({
+            type: "data-metadata",
+            data: {
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              chatId: id ?? null,
+              jobId: job.job_id,
+            },
+          });
+
           let textId: string | undefined;
           let sawText = false;
+          let emittedStreamingStatus = false;
 
           for await (const event of streamAgentEvents({
             eventsUrl: job.events_url,
@@ -160,6 +209,19 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
                 writer.write({
                   type: "text-start",
                   id: textId,
+                });
+              }
+
+              if (!emittedStreamingStatus) {
+                emittedStreamingStatus = true;
+                writer.write({
+                  type: "data-status",
+                  data: {
+                    stage: "streaming",
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                  },
                 });
               }
 
@@ -229,6 +291,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
                 userId: resolvedUserId,
                 jobId: job.job_id,
                 note: "No assistant text chunks were emitted",
+              },
+            });
+          } else {
+            writer.write({
+              type: "data-status",
+              data: {
+                stage: "complete",
+                threadId: resolvedThreadId,
+                userId: resolvedUserId,
+                jobId: job.job_id,
               },
             });
           }

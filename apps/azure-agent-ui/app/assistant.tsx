@@ -36,15 +36,6 @@ export const Assistant = ({ threadId, userId }: AssistantProps) => {
         userId,
         threadId,
       },
-      prepareSendMessagesRequest: ({ body }) => {
-        return {
-          body: {
-            ...body,
-            userId,
-            threadId,
-          },
-        };
-      },
     });
   }, [apiBaseUrl, threadId, userId]);
 
