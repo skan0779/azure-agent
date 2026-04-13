@@ -1,6 +1,12 @@
 "use client";
 
-import { startTransition, useEffect, useMemo, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
@@ -76,18 +82,18 @@ export function ChatShell() {
     saveActiveChatId(activeChatId);
   }, [activeChatId, isReady]);
 
-  const handleNewChat = () => {
+  const handleNewChat = useCallback(() => {
     const session = createChatSession();
 
     setSessions((current) => [session, ...current]);
     setActiveChatId(session.id);
-  };
+  }, []);
 
-  const handleSelectChat = (chatId: string) => {
+  const handleSelectChat = useCallback((chatId: string) => {
     setActiveChatId(chatId);
-  };
+  }, []);
 
-  const handleSessionTouched = (chatId: string, titleHint?: string) => {
+  const handleSessionTouched = useCallback((chatId: string, titleHint?: string) => {
     setSessions((current) => {
       return current.map((session) => {
         if (session.id !== chatId) {
@@ -108,7 +114,7 @@ export function ChatShell() {
         };
       });
     });
-  };
+  }, []);
 
   const sidebarSessions = useMemo(() => {
     return [...sessions].sort((left, right) =>

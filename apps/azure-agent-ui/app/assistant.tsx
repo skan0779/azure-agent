@@ -70,8 +70,13 @@ const ThreadPersistence = ({
     })),
   );
   const didRestoreRef = useRef(false);
+  const restoredChatIdRef = useRef<string | null>(null);
 
   useEffect(() => {
+    if (restoredChatIdRef.current === chatId) {
+      return;
+    }
+
     const storageKey = getThreadStorageKey(chatId);
     const raw = window.localStorage.getItem(storageKey);
     if (raw) {
@@ -83,6 +88,7 @@ const ThreadPersistence = ({
     }
 
     didRestoreRef.current = true;
+    restoredChatIdRef.current = chatId;
   }, [chatId, runtime]);
 
   useEffect(() => {
