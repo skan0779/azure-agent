@@ -56,7 +56,7 @@ export const Assistant = ({ threadId, userId }: AssistantProps) => {
 
   if (!apiBaseUrl) {
     return (
-      <div className="flex h-full items-center justify-center bg-background px-6">
+      <div className="flex h-dvh items-center justify-center bg-background px-6">
         <div className="w-full max-w-xl rounded-2xl border border-border bg-card p-6 text-card-foreground shadow-sm">
           <h1 className="text-lg font-semibold">Agent Web URL not configured</h1>
           <p className="mt-2 text-sm text-muted-foreground">
@@ -70,9 +70,9 @@ export const Assistant = ({ threadId, userId }: AssistantProps) => {
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <div className="h-full">
+      <div className="h-dvh bg-background">
         <Thread />
       </div>
     </AssistantRuntimeProvider>
   );
-};
+}

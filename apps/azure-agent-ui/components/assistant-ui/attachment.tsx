@@ -32,10 +32,13 @@ import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button
 import { cn } from "@/lib/utils";
 
 const useFileSrc = (file: File | undefined) => {
-  const src = useMemo(
-    () => (file ? URL.createObjectURL(file) : undefined),
-    [file],
-  );
+  const src = useMemo(() => {
+    if (!file) {
+      return undefined;
+    }
+
+    return URL.createObjectURL(file);
+  }, [file]);
 
   useEffect(() => {
     return () => {
