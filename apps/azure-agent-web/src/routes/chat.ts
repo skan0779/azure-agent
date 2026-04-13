@@ -37,6 +37,24 @@ const isAbortError = (error: unknown): boolean => {
   );
 };
 
+const buildStreamCorsHeaders = (
+  origin: string | undefined,
+): Record<string, string> => {
+  if (!origin) {
+    return {};
+  }
+
+  if (!config.corsOrigins.includes(origin)) {
+    return {};
+  }
+
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Credentials": "true",
+    Vary: "Origin",
+  };
+};
+
 export const chatRoutes: FastifyPluginAsync = async (app) => {
   app.post("/api/chat/cancel", async (request, reply) => {
     const parsed = cancelBodySchema.safeParse(request.body);
@@ -56,6 +74,15 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       parsed.data.userId?.trim() ||
       headerUserId?.trim() ||
       config.defaultUserId;
+
+    app.log.info(
+      {
+        jobId: parsed.data.jobId,
+        userId: resolvedUserId,
+        agentApiBaseUrl: config.agentApiBaseUrl,
+      },
+      "Cancelling agent job",
+    );
 
     await cancelAgentJobById({
       baseUrl: config.agentApiBaseUrl,
@@ -135,11 +162,23 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       void requestJobCancel();
     };
 
-    request.raw.once("close", abortHandler);
+    request.raw.once("aborted", abortHandler);
 
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         try {
+          app.log.info(
+            {
+              requestId: request.id,
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              messageCount: messages.length,
+              lastUserText,
+              agentApiBaseUrl: config.agentApiBaseUrl,
+            },
+            "Starting chat request",
+          );
+
           writer.write({
             type: "data-metadata",
             data: {
@@ -158,6 +197,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
             },
           });
 
+          app.log.info(
+            {
+              requestId: request.id,
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              agentApiBaseUrl: config.agentApiBaseUrl,
+            },
+            "Creating agent job",
+          );
+
           const job = await createAgentJob({
             baseUrl: config.agentApiBaseUrl,
             threadId: resolvedThreadId,
@@ -166,6 +215,18 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
             signal: abortController.signal,
           });
           activeJob = job;
+
+          app.log.info(
+            {
+              requestId: request.id,
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              jobId: job.job_id,
+              status: job.status,
+              eventsUrl: job.events_url,
+            },
+            "Created agent job",
+          );
 
           writer.write({
             type: "data-status",
@@ -192,6 +253,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
           let sawText = false;
           let emittedStreamingStatus = false;
 
+          app.log.info(
+            {
+              requestId: request.id,
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              jobId: job.job_id,
+            },
+            "Opening agent event stream",
+          );
+
           for await (const event of streamAgentEvents({
             eventsUrl: job.events_url,
             userId: resolvedUserId,
@@ -214,6 +285,15 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
               if (!emittedStreamingStatus) {
                 emittedStreamingStatus = true;
+                app.log.info(
+                  {
+                    requestId: request.id,
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                  },
+                  "Received first text chunk from agent stream",
+                );
                 writer.write({
                   type: "data-status",
                   data: {
@@ -236,6 +316,15 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
             if (event.type === "complete") {
               isTerminal = true;
+              app.log.info(
+                {
+                  requestId: request.id,
+                  threadId: resolvedThreadId,
+                  userId: resolvedUserId,
+                  jobId: job.job_id,
+                },
+                "Agent stream completed",
+              );
               break;
             }
 
@@ -252,6 +341,15 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
             if (event.type === "cancelled") {
               isTerminal = true;
+              app.log.info(
+                {
+                  requestId: request.id,
+                  threadId: resolvedThreadId,
+                  userId: resolvedUserId,
+                  jobId: job.job_id,
+                },
+                "Agent stream cancelled",
+              );
               writer.write({
                 type: "data-status",
                 data: {
@@ -306,9 +404,30 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
           }
         } catch (error) {
           if (isAbortError(error) || abortController.signal.aborted) {
+            app.log.info(
+              {
+                requestId: request.id,
+                threadId: resolvedThreadId,
+                userId: resolvedUserId,
+                jobId: activeJob?.job_id,
+              },
+              "Chat request aborted by client",
+            );
             await requestJobCancel();
             return;
           }
+
+          app.log.error(
+            {
+              err: error,
+              requestId: request.id,
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              jobId: activeJob?.job_id,
+              agentApiBaseUrl: config.agentApiBaseUrl,
+            },
+            "Chat request failed",
+          );
 
           throw error;
         }
@@ -316,17 +435,25 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     });
 
     reply.hijack();
+    reply.raw.once("close", () => {
+      if (reply.raw.writableEnded || isTerminal) {
+        return;
+      }
+
+      abortHandler();
+    });
     pipeUIMessageStreamToResponse({
       response: reply.raw,
       stream,
       status: 200,
       headers: {
         "Cache-Control": "no-cache",
+        ...buildStreamCorsHeaders(request.headers.origin),
       },
     });
 
     request.raw.once("close", () => {
-      request.raw.off("close", abortHandler);
+      request.raw.off("aborted", abortHandler);
     });
   });
 };

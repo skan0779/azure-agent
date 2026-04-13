@@ -26,8 +26,8 @@ eggs/
 lib/
 !apps/azure-agent-ui/lib/
 !apps/azure-agent-ui/lib/**
-!apps/azure-agent-web/lib/
-!apps/azure-agent-web/lib/**
+!apps/azure-agent-web/src/lib/
+!apps/azure-agent-web/src/lib/**
 lib64/
 parts/
 sdist/

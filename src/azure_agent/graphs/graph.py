@@ -10,11 +10,6 @@ from redis.asyncio import Redis
 
 from fastapi.encoders import jsonable_encoder
 
-from langchain_azure_ai.agents.middleware import (
-    AzureContentModerationMiddleware,
-    AzurePromptShieldMiddleware,
-)
-
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
@@ -43,6 +38,10 @@ from azure_agent.config import AppSecrets, load_app_secrets
 from azure_agent.middlewares.stream import (
     event_stream_before_agent,
     event_stream_before_model,
+)
+from azure_agent.middlewares.azure_ai_content_safety import (
+    azure_content_moderation_middleware,
+    azure_prompt_shield_middleware,
 )
 from azure_agent.graphs.schema import AgentState, UserProfile
 from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
@@ -519,17 +518,13 @@ class LangGraphProcess:
                 PIIMiddleware("credit_card", strategy="mask"),
 
                 # Content Safety Middleware
-                AzureContentModerationMiddleware(
+                azure_content_moderation_middleware(
                     endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
                     credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
-                    categories=["Hate", "SelfHarm", "Sexual", "Violence"],
-                    severity_threshold=5,
-                    exit_behavior="error",
                 ),
-                AzurePromptShieldMiddleware(
+                azure_prompt_shield_middleware(
                     endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
                     credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
-                    exit_behavior="error",
                 ),
             ],
             state_schema=AgentState,
@@ -586,7 +581,7 @@ class LangGraphProcess:
                 "messages", 
                 "updates", 
                 "custom", 
-                "tasks" # optional
+                # "tasks" # optional
             ],
             version="v2",
         )
@@ -621,12 +616,12 @@ class LangGraphProcess:
                     }
 
                 # Stream Tasks
-                elif chunk["type"] == "tasks":
-                    yield {
-                        "type": "tasks",
-                        "ns": list(chunk["ns"]),
-                        "data": jsonable_encoder(chunk["data"]),
-                    }
+                # elif chunk["type"] == "tasks":
+                #     yield {
+                #         "type": "tasks",
+                #         "ns": list(chunk["ns"]),
+                #         "data": jsonable_encoder(chunk["data"]),
+                #     }
            
             # Completion Event
             yield {
