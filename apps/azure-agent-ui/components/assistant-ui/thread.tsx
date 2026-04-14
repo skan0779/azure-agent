@@ -38,7 +38,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
-      <ThreadPrimitive.Viewport className="flex grow flex-col gap-8 overflow-y-scroll pt-16">
+      <ThreadPrimitive.Viewport className="aui-scrollbar flex grow flex-col gap-8 overflow-y-auto pt-16">
         <AuiIf condition={(s) => s.thread.isEmpty}>
           <div className="flex grow flex-col items-center justify-center">
             <Avatar className="flex h-12 w-12 items-center justify-center rounded-3xl border shadow dark:border-white/15">

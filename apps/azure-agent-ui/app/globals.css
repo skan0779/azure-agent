@@ -18,3 +18,27 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+.aui-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #3a3a3a #212121;
+}
+
+.aui-scrollbar::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.aui-scrollbar::-webkit-scrollbar-track {
+  background: #212121;
+}
+
+.aui-scrollbar::-webkit-scrollbar-thumb {
+  border: 3px solid #212121;
+  border-radius: 9999px;
+  background: #3a3a3a;
+}
+
+.aui-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}

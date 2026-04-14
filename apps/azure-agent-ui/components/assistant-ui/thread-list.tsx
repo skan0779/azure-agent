@@ -24,7 +24,7 @@ export const ThreadList: FC = () => {
         <PlusIcon className="size-4 shrink-0" />
         <span>New chat</span>
       </ThreadListPrimitive.New>
-      <div className="mt-4 flex-1 overflow-y-auto">
+      <div className="aui-scrollbar mt-4 flex-1 overflow-y-auto">
         <AuiIf condition={(s) => s.threads.isLoading}>
           <ThreadListSkeleton />
         </AuiIf>
