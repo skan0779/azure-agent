@@ -20,7 +20,6 @@ import { localThreadMessageStore } from "@/lib/thread-message-store.local";
 import { LocalThreadListAdapter } from "@/lib/thread-list-adapter.local";
 import {
   DEFAULT_THREAD_TITLE,
-  ensureLocalActiveThread,
   localThreadStore,
 } from "@/lib/thread-store.local";
 
@@ -31,6 +30,26 @@ const getLocalThreadStoreState = () => {
   return localThreadStore.getState() as Awaited<
     ReturnType<typeof localThreadStore.getState>
   >;
+};
+
+const getInitialStoredThreadId = () => {
+  const state = getLocalThreadStoreState();
+
+  if (state.activeThreadId) {
+    const activeThread = state.threads.find(
+      (thread) => thread.id === state.activeThreadId,
+    );
+    if (activeThread) {
+      return activeThread.id;
+    }
+  }
+
+  if (state.threads[0]) {
+    localThreadStore.setActiveThread(state.threads[0].id);
+    return state.threads[0].id;
+  }
+
+  return null;
 };
 
 const createAutoThreadTitle = (text: string) => {
@@ -202,7 +221,7 @@ const ChatShellRuntime = ({
   initialThreadId,
 }: {
   apiBaseUrl: string;
-  initialThreadId: string;
+  initialThreadId?: string;
 }) => {
   const adapter = useMemo(() => new LocalThreadListAdapter(), []);
 
@@ -240,10 +259,10 @@ export const ChatShell = () => {
   );
   const initialThreadId = useMemo(() => {
     if (!isHydrated) {
-      return null;
+      return undefined;
     }
 
-    return ensureLocalActiveThread(localThreadStore).id;
+    return getInitialStoredThreadId() ?? undefined;
   }, [isHydrated]);
 
   const apiBaseUrl = useMemo(() => {
@@ -259,7 +278,7 @@ export const ChatShell = () => {
     return undefined;
   }, []);
 
-  if (!isHydrated || !initialThreadId) {
+  if (!isHydrated) {
     return null;
   }
 
