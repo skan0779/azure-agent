@@ -55,10 +55,15 @@ const ThreadListItem: FC = () => {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title ?? "New chat");
   const status = useAuiState((s) => s.threadListItem.status);
+  const isMain = useAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
 
   const canRename = status !== "new";
+
+  if (status === "new" && !isMain) {
+    return null;
+  }
 
   const commitRename = () => {
     const nextTitle = draftTitle.trim();
