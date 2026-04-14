@@ -74,9 +74,29 @@ export const extractLastUserText = (messages: unknown[]): string | undefined => 
   return undefined;
 };
 
-export const extractLangChainChunkText = (message: unknown): string => {
+export const extractLangChainChunkText = (
+  message: unknown,
+  metadata?: unknown,
+): string => {
   if (!message || typeof message !== "object") {
     return "";
+  }
+
+  const messageType =
+    "type" in message && typeof message.type === "string" ? message.type : "";
+  if (messageType !== "AIMessageChunk") {
+    return "";
+  }
+
+  if (metadata && typeof metadata === "object") {
+    const langgraphNode =
+      "langgraph_node" in metadata && typeof metadata.langgraph_node === "string"
+        ? metadata.langgraph_node
+        : undefined;
+
+    if (langgraphNode && langgraphNode !== "model") {
+      return "";
+    }
   }
 
   const payload =
@@ -104,7 +124,12 @@ export const extractLangChainChunkText = (message: unknown): string => {
             return "";
           }
 
-          if ("text" in part && typeof part.text === "string") {
+          if (
+            "type" in part &&
+            part.type === "text" &&
+            "text" in part &&
+            typeof part.text === "string"
+          ) {
             return part.text;
           }
 

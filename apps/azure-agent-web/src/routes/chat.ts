@@ -270,7 +270,8 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
           })) {
             if (event.type === "messages" && Array.isArray(event.data)) {
               const message = event.data[0];
-              const delta = extractLangChainChunkText(message);
+              const metadata = event.data[1];
+              const delta = extractLangChainChunkText(message, metadata);
               if (!delta) {
                 continue;
               }
