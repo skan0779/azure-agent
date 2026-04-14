@@ -33,7 +33,7 @@ import {
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export const Thread: FC = () => {
   return (
@@ -62,7 +62,7 @@ export const Thread: FC = () => {
           <ThreadScrollToBottom />
           <Composer />
           <p className="text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
-            ChatGPT can make mistakes. Check important info.
+            AzureAgent can make mistakes. Check important info.
           </p>
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>
@@ -168,15 +168,8 @@ const EditComposer: FC = () => {
 
 const AssistantMessage: FC = () => {
   return (
-    <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl gap-3">
-      <Avatar className="flex size-8 shrink-0 items-center justify-center rounded-3xl border shadow dark:border-white/15">
-        <AvatarImage />
-        <AvatarFallback className="text-foreground text-xs dark:text-white">
-          C
-        </AvatarFallback>
-      </Avatar>
-
-      <div className="pt-1">
+    <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl">
+      <div className="min-w-0 flex-1 pt-1">
         <div className="text-foreground dark:text-[#eee]">
           <MessagePrimitive.Parts>
             {({ part }) => {
