@@ -2,6 +2,7 @@ import type {
   RemoteThreadListAdapter,
 } from "@assistant-ui/react";
 
+import { localThreadMessageStore } from "@/lib/thread-message-store.local";
 import { localThreadStore } from "@/lib/thread-store.local";
 
 type LocalRemoteThreadInitializeResponse = {
@@ -76,6 +77,7 @@ export class LocalThreadListAdapter implements RemoteThreadListAdapter {
   }
 
   async delete(remoteId: string): Promise<void> {
+    localThreadMessageStore.clearMessages(remoteId);
     localThreadStore.deleteThread(remoteId);
   }
 

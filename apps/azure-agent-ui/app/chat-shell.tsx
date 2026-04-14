@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { localThreadMessageStore } from "@/lib/thread-message-store.local";
 import { LocalThreadListAdapter } from "@/lib/thread-list-adapter.local";
 import {
   DEFAULT_THREAD_TITLE,
@@ -79,24 +80,35 @@ const useLocalChatThreadRuntime = ({
   userId: string;
 }) => {
   const threadId = useAuiState((s) => s.threadListItem.id);
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const storageThreadId = remoteId ?? threadId;
+  const initialMessages = useMemo(
+    () => localThreadMessageStore.getMessages(storageThreadId),
+    [storageThreadId],
+  );
 
   const transport = useMemo(
     () =>
       new AssistantChatTransport({
-      api: `${apiBaseUrl}/api/chat`,
-      body: {
-        userId,
-        threadId,
-      },
+        api: `${apiBaseUrl}/api/chat`,
+        body: {
+          userId,
+          threadId,
+        },
       }),
     [apiBaseUrl, threadId, userId],
   );
 
   const chat = useChat({
     id: threadId,
+    messages: initialMessages,
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
   });
+
+  useEffect(() => {
+    localThreadMessageStore.setMessages(storageThreadId, chat.messages);
+  }, [chat.messages, storageThreadId]);
 
   const runtime = useAISDKRuntime(chat);
 
