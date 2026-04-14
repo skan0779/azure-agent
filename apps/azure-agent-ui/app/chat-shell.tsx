@@ -12,7 +12,7 @@ import {
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
@@ -233,13 +233,18 @@ const ChatShellRuntime = ({
 };
 
 export const ChatShell = () => {
-  const [initialThreadId] = useState<string | null>(() => {
-    if (typeof window === "undefined") {
+  const isHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
+  const initialThreadId = useMemo(() => {
+    if (!isHydrated) {
       return null;
     }
 
     return ensureLocalActiveThread(localThreadStore).id;
-  });
+  }, [isHydrated]);
 
   const apiBaseUrl = useMemo(() => {
     const configuredUrl = process.env.NEXT_PUBLIC_AGENT_WEB_URL?.trim();
@@ -254,7 +259,7 @@ export const ChatShell = () => {
     return undefined;
   }, []);
 
-  if (!initialThreadId) {
+  if (!isHydrated || !initialThreadId) {
     return null;
   }
 
