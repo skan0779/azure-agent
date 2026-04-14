@@ -108,30 +108,29 @@ const useLocalChatThreadRuntime = ({
 };
 
 const ThreadStoreSync = () => {
-  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
 
   useEffect(() => {
-    if (!mainThreadId) {
+    if (!remoteId) {
       return;
     }
 
     const state = getLocalThreadStoreState();
-    const existing = state.threads.find((thread) => thread.id === mainThreadId);
+    const existing = state.threads.find((thread) => thread.id === remoteId);
 
     if (existing) {
-      localThreadStore.setActiveThread(mainThreadId);
+      localThreadStore.setActiveThread(remoteId);
       return;
     }
 
-    localThreadStore.createThread({ id: mainThreadId });
-  }, [mainThreadId]);
+    localThreadStore.createThread({ id: remoteId });
+  }, [remoteId]);
 
   return null;
 };
 
 const ThreadTitleSync = () => {
   const aui = useAui();
-  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const firstUserTitle = useAuiState((s) =>
     getFirstUserMessageTitle(
@@ -146,12 +145,12 @@ const ThreadTitleSync = () => {
   );
 
   useEffect(() => {
-    if (!mainThreadId || !remoteId || !firstUserTitle) {
+    if (!remoteId || !firstUserTitle) {
       return;
     }
 
     const state = getLocalThreadStoreState();
-    const thread = state.threads.find((item) => item.id === mainThreadId);
+    const thread = state.threads.find((item) => item.id === remoteId);
     if (!thread) {
       return;
     }
@@ -170,18 +169,18 @@ const ThreadTitleSync = () => {
     }
 
     if (thread.title === firstUserTitle) {
-      localThreadStore.updateThread(mainThreadId, {
+      localThreadStore.updateThread(remoteId, {
         titleSource: "first-user-message",
       });
       return;
     }
 
     aui.threads().item("main").rename(firstUserTitle);
-    localThreadStore.updateThread(mainThreadId, {
+    localThreadStore.updateThread(remoteId, {
       title: firstUserTitle,
       titleSource: "first-user-message",
     });
-  }, [aui, firstUserTitle, mainThreadId, remoteId]);
+  }, [aui, firstUserTitle, remoteId]);
 
   return null;
 };
