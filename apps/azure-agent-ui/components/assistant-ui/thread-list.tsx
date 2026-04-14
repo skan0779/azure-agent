@@ -6,7 +6,7 @@ import {
   ThreadListItemPrimitive,
   ThreadListPrimitive,
 } from "@assistant-ui/react";
-import { MessageSquareText, PlusIcon } from "lucide-react";
+import { MessageSquareText, PlusIcon, Trash2Icon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -47,17 +47,25 @@ const ThreadListSkeleton: FC = () => {
 const ThreadListItem: FC = () => {
   return (
     <ThreadListItemPrimitive.Root className="group/thread-item">
-      <ThreadListItemPrimitive.Trigger className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]">
-        <MessageSquareText className="size-4 shrink-0 opacity-70" />
-        <div
-          className={cn(
-            "min-w-0 flex-1 truncate",
-            "group-data-[active=true]/thread-item:text-[#f8f8f8]",
-          )}
+      <div className="flex items-center gap-1">
+        <ThreadListItemPrimitive.Trigger className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]">
+          <MessageSquareText className="size-4 shrink-0 opacity-70" />
+          <div
+            className={cn(
+              "min-w-0 flex-1 truncate",
+              "group-data-[active=true]/thread-item:text-[#f8f8f8]",
+            )}
+          >
+            <ThreadListItemPrimitive.Title fallback="New chat" />
+          </div>
+        </ThreadListItemPrimitive.Trigger>
+        <ThreadListItemPrimitive.Delete
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-0 transition hover:bg-white/10 hover:text-[#f3f3f3] group-hover/thread-item:opacity-100 focus-visible:opacity-100"
+          aria-label="Delete thread"
         >
-          <ThreadListItemPrimitive.Title fallback="New chat" />
-        </div>
-      </ThreadListItemPrimitive.Trigger>
+          <Trash2Icon className="size-4" />
+        </ThreadListItemPrimitive.Delete>
+      </div>
     </ThreadListItemPrimitive.Root>
   );
 };

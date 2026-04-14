@@ -3,6 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 import {
   AssistantRuntimeProvider,
+  useAui,
   useAuiState,
   useRemoteThreadListRuntime,
 } from "@assistant-ui/react";
@@ -16,9 +17,59 @@ import { useEffect, useMemo, useState } from "react";
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 import { LocalThreadListAdapter } from "@/lib/thread-list-adapter.local";
-import { ensureLocalActiveThread, localThreadStore } from "@/lib/thread-store.local";
+import {
+  DEFAULT_THREAD_TITLE,
+  ensureLocalActiveThread,
+  localThreadStore,
+} from "@/lib/thread-store.local";
 
 const DEFAULT_USER_ID = "1015520";
+const AUTO_TITLE_TOKEN_LIMIT = 7;
+
+const getLocalThreadStoreState = () => {
+  return localThreadStore.getState() as Awaited<
+    ReturnType<typeof localThreadStore.getState>
+  >;
+};
+
+const createAutoThreadTitle = (text: string) => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return DEFAULT_THREAD_TITLE;
+  }
+
+  const tokens = normalized.split(" ");
+  if (tokens.length <= AUTO_TITLE_TOKEN_LIMIT) {
+    return normalized;
+  }
+
+  return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
+};
+
+const getFirstUserMessageTitle = (
+  messages: readonly {
+    role: string;
+    content: readonly { type: string; text?: string }[];
+  }[],
+) => {
+  const firstUserMessage = messages.find((message) => message.role === "user");
+  if (!firstUserMessage) {
+    return null;
+  }
+
+  const text = firstUserMessage.content
+    .filter((part) => part.type === "text" && typeof part.text === "string")
+    .map((part) => part.text?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ")
+    .trim();
+
+  if (!text) {
+    return null;
+  }
+
+  return createAutoThreadTitle(text);
+};
 
 const useLocalChatThreadRuntime = ({
   apiBaseUrl,
@@ -64,9 +115,7 @@ const ThreadStoreSync = () => {
       return;
     }
 
-    const state = localThreadStore.getState() as Awaited<
-      ReturnType<typeof localThreadStore.getState>
-    >;
+    const state = getLocalThreadStoreState();
     const existing = state.threads.find((thread) => thread.id === mainThreadId);
 
     if (existing) {
@@ -76,6 +125,63 @@ const ThreadStoreSync = () => {
 
     localThreadStore.createThread({ id: mainThreadId });
   }, [mainThreadId]);
+
+  return null;
+};
+
+const ThreadTitleSync = () => {
+  const aui = useAui();
+  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const firstUserTitle = useAuiState((s) =>
+    getFirstUserMessageTitle(
+      s.thread.messages.map((message) => ({
+        role: message.role,
+        content: message.content.map((part) => ({
+          type: part.type,
+          text: "text" in part ? part.text : undefined,
+        })),
+      })),
+    ),
+  );
+
+  useEffect(() => {
+    if (!mainThreadId || !remoteId || !firstUserTitle) {
+      return;
+    }
+
+    const state = getLocalThreadStoreState();
+    const thread = state.threads.find((item) => item.id === mainThreadId);
+    if (!thread) {
+      return;
+    }
+
+    const hasManualTitle =
+      thread.titleSource === "manual" && thread.title !== DEFAULT_THREAD_TITLE;
+    if (hasManualTitle) {
+      return;
+    }
+
+    if (
+      thread.titleSource === "first-user-message" &&
+      thread.title === firstUserTitle
+    ) {
+      return;
+    }
+
+    if (thread.title === firstUserTitle) {
+      localThreadStore.updateThread(mainThreadId, {
+        titleSource: "first-user-message",
+      });
+      return;
+    }
+
+    aui.threads().item("main").rename(firstUserTitle);
+    localThreadStore.updateThread(mainThreadId, {
+      title: firstUserTitle,
+      titleSource: "first-user-message",
+    });
+  }, [aui, firstUserTitle, mainThreadId, remoteId]);
 
   return null;
 };
@@ -104,6 +210,7 @@ const ChatShellRuntime = ({
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ThreadStoreSync />
+      <ThreadTitleSync />
       <div className="flex h-dvh bg-[#212121] text-[#ececec]">
         <ThreadListSidebar />
         <main className="min-w-0 flex-1">

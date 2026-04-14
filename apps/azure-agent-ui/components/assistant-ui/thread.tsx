@@ -62,7 +62,7 @@ export const Thread: FC = () => {
           <ThreadScrollToBottom />
           <Composer />
           <p className="text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
-            AzureAgent can make mistakes. Check important info.
+            Agent can make mistakes. Check important info.
           </p>
         </ThreadPrimitive.ViewportFooter>
       </ThreadPrimitive.Viewport>

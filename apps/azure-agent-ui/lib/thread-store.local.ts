@@ -20,7 +20,7 @@ type LocalThreadStore = {
   clearActiveThread(): void;
 };
 
-const DEFAULT_THREAD_TITLE = "New chat";
+export const DEFAULT_THREAD_TITLE = "New chat";
 
 const canUseStorage = () => typeof window !== "undefined";
 
