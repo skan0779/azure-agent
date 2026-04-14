@@ -12,7 +12,7 @@ import {
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
@@ -32,7 +32,7 @@ const getLocalThreadStoreState = () => {
   >;
 };
 
-const getInitialStoredThreadId = () => {
+const getStoredActiveThreadId = () => {
   const state = getLocalThreadStoreState();
 
   if (state.activeThreadId) {
@@ -49,7 +49,7 @@ const getInitialStoredThreadId = () => {
     return state.threads[0].id;
   }
 
-  return null;
+  return undefined;
 };
 
 const createAutoThreadTitle = (text: string) => {
@@ -160,6 +160,33 @@ const ThreadStoreSync = () => {
   return null;
 };
 
+const InitialThreadSwitch = ({
+  storedThreadId,
+}: {
+  storedThreadId?: string;
+}) => {
+  const aui = useAui();
+  const isLoading = useAuiState((s) => s.threads.isLoading);
+  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  const hasSwitchedRef = useRef(false);
+
+  useEffect(() => {
+    if (hasSwitchedRef.current || isLoading || !storedThreadId) {
+      return;
+    }
+
+    if (mainThreadId === storedThreadId) {
+      hasSwitchedRef.current = true;
+      return;
+    }
+
+    hasSwitchedRef.current = true;
+    void aui.threads().switchToThread(storedThreadId);
+  }, [aui, isLoading, mainThreadId, storedThreadId]);
+
+  return null;
+};
+
 const ThreadTitleSync = () => {
   const aui = useAui();
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
@@ -218,10 +245,10 @@ const ThreadTitleSync = () => {
 
 const ChatShellRuntime = ({
   apiBaseUrl,
-  initialThreadId,
+  storedThreadId,
 }: {
   apiBaseUrl: string;
-  initialThreadId?: string;
+  storedThreadId?: string;
 }) => {
   const adapter = useMemo(() => new LocalThreadListAdapter(), []);
 
@@ -233,12 +260,12 @@ const ChatShellRuntime = ({
       });
     },
     adapter,
-    threadId: initialThreadId,
     allowNesting: true,
   });
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
+      <InitialThreadSwitch storedThreadId={storedThreadId} />
       <ThreadStoreSync />
       <ThreadTitleSync />
       <div className="flex h-dvh bg-[#212121] text-[#ececec]">
@@ -257,12 +284,12 @@ export const ChatShell = () => {
     () => true,
     () => false,
   );
-  const initialThreadId = useMemo(() => {
+  const storedThreadId = useMemo(() => {
     if (!isHydrated) {
       return undefined;
     }
 
-    return getInitialStoredThreadId() ?? undefined;
+    return getStoredActiveThreadId();
   }, [isHydrated]);
 
   const apiBaseUrl = useMemo(() => {
@@ -299,7 +326,7 @@ export const ChatShell = () => {
   return (
     <ChatShellRuntime
       apiBaseUrl={apiBaseUrl}
-      initialThreadId={initialThreadId}
+      storedThreadId={storedThreadId}
     />
   );
 };

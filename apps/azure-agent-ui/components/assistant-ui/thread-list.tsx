@@ -1,6 +1,6 @@
 "use client";
 
-import { type FC, useMemo, useState } from "react";
+import { type FC, useState } from "react";
 import {
   AuiIf,
   ThreadListItemPrimitive,
@@ -15,14 +15,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 
-import { localThreadStore } from "@/lib/thread-store.local";
 import { cn } from "@/lib/utils";
-
-const getLocalThreadStoreState = () => {
-  return localThreadStore.getState() as Awaited<
-    ReturnType<typeof localThreadStore.getState>
-  >;
-};
 
 export const ThreadList: FC = () => {
   return (
@@ -61,25 +54,14 @@ const ThreadListSkeleton: FC = () => {
 const ThreadListItem: FC = () => {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title ?? "New chat");
-  const threadId = useAuiState((s) => s.threadListItem.id);
-  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const status = useAuiState((s) => s.threadListItem.status);
   const isMain = useAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
-  const existsInLocalStore = useMemo(() => {
-    const storeThreadId = remoteId ?? threadId;
-
-    return getLocalThreadStoreState().threads.some(
-      (thread) => thread.id === storeThreadId,
-    );
-  }, [remoteId, threadId]);
 
   const canRename = status !== "new";
 
-  if (isMain && status === "new") {
-    // Keep the active unsent thread visible.
-  } else if (status === "new" || !existsInLocalStore) {
+  if (status === "new" && !isMain) {
     return null;
   }
 
