@@ -3,7 +3,7 @@ import type {
 } from "@assistant-ui/react";
 
 import { localThreadMessageStore } from "@/lib/thread-message-store.local";
-import { localThreadStore } from "@/lib/thread-store.local";
+import { isUuidThreadId, localThreadStore } from "@/lib/thread-store.local";
 
 type LocalRemoteThreadInitializeResponse = {
   remoteId: string;
@@ -32,6 +32,10 @@ const getLocalThreadStoreState = () => {
 const toRemoteThreadMetadata = (
   threadId: string,
 ): LocalRemoteThreadMetadata | undefined => {
+  if (!isUuidThreadId(threadId)) {
+    return undefined;
+  }
+
   const state = getLocalThreadStoreState();
   const thread = state.threads.find((item) => item.id === threadId);
 
@@ -84,6 +88,14 @@ export class LocalThreadListAdapter implements RemoteThreadListAdapter {
   async initialize(
     threadId: string,
   ): Promise<LocalRemoteThreadInitializeResponse> {
+    if (!isUuidThreadId(threadId)) {
+      const created = await localThreadStore.createThread();
+      return {
+        remoteId: created.id,
+        externalId: undefined,
+      };
+    }
+
     const existing = toRemoteThreadMetadata(threadId);
 
     if (!existing) {
@@ -103,6 +115,16 @@ export class LocalThreadListAdapter implements RemoteThreadListAdapter {
   }
 
   async fetch(threadId: string): Promise<LocalRemoteThreadMetadata> {
+    if (!isUuidThreadId(threadId)) {
+      const created = await localThreadStore.createThread();
+      return {
+        status: "regular",
+        remoteId: created.id,
+        externalId: undefined,
+        title: created.title,
+      };
+    }
+
     const thread = toRemoteThreadMetadata(threadId);
 
     if (thread) {

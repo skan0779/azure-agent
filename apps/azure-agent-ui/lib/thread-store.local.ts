@@ -1,5 +1,6 @@
 import {
   ACTIVE_THREAD_ID_STORAGE_KEY,
+  THREAD_MESSAGES_STORAGE_KEY,
   THREAD_STORE_STORAGE_KEY,
 } from "@/lib/thread-store.keys";
 import type {
@@ -22,6 +23,9 @@ type LocalThreadStore = {
 
 export const DEFAULT_THREAD_TITLE = "New chat";
 
+const THREAD_ID_UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const canUseStorage = () => typeof window !== "undefined";
 
 const createThreadId = () => crypto.randomUUID();
@@ -36,10 +40,136 @@ const sortThreads = (threads: ThreadSummary[]) => {
   });
 };
 
+export const isUuidThreadId = (
+  threadId: string | null | undefined,
+): threadId is ThreadId => {
+  return typeof threadId === "string" && THREAD_ID_UUID_REGEX.test(threadId);
+};
+
+const normalizeThreadStorage = () => {
+  if (!canUseStorage()) {
+    return;
+  }
+
+  const rawThreads = window.localStorage.getItem(THREAD_STORE_STORAGE_KEY);
+  const rawActiveThreadId = window.localStorage.getItem(
+    ACTIVE_THREAD_ID_STORAGE_KEY,
+  );
+  const rawThreadMessages = window.localStorage.getItem(
+    THREAD_MESSAGES_STORAGE_KEY,
+  );
+
+  const idMap = new Map<string, string>();
+  let hasMutation = false;
+
+  const normalizedThreads: ThreadSummary[] = [];
+  if (rawThreads) {
+    try {
+      const parsed = JSON.parse(rawThreads);
+      if (Array.isArray(parsed)) {
+        for (const value of parsed) {
+          if (!isThreadSummary(value)) {
+            hasMutation = true;
+            continue;
+          }
+
+          let nextId = value.id;
+          if (!isUuidThreadId(nextId)) {
+            nextId = idMap.get(value.id) ?? createThreadId();
+            idMap.set(value.id, nextId);
+            hasMutation = true;
+          }
+
+          normalizedThreads.push({
+            ...value,
+            id: nextId,
+          });
+        }
+      } else {
+        hasMutation = true;
+      }
+    } catch {
+      hasMutation = true;
+    }
+  }
+
+  const uniqueThreads = sortThreads(
+    Array.from(new Map(normalizedThreads.map((thread) => [thread.id, thread])).values()),
+  );
+
+  let nextActiveThreadId: string | null = rawActiveThreadId;
+  if (nextActiveThreadId && idMap.has(nextActiveThreadId)) {
+    nextActiveThreadId = idMap.get(nextActiveThreadId) ?? null;
+    hasMutation = true;
+  }
+
+  if (
+    nextActiveThreadId &&
+    (!isUuidThreadId(nextActiveThreadId) ||
+      !uniqueThreads.some((thread) => thread.id === nextActiveThreadId))
+  ) {
+    nextActiveThreadId = uniqueThreads[0]?.id ?? null;
+    hasMutation = true;
+  }
+
+  const normalizedThreadMessages: Record<string, unknown> = {};
+  if (rawThreadMessages) {
+    try {
+      const parsed = JSON.parse(rawThreadMessages);
+      if (parsed && typeof parsed === "object") {
+        for (const [threadId, messages] of Object.entries(parsed)) {
+          const nextThreadId = isUuidThreadId(threadId)
+            ? threadId
+            : (idMap.get(threadId) ?? null);
+
+          if (!nextThreadId) {
+            hasMutation = true;
+            continue;
+          }
+
+          normalizedThreadMessages[nextThreadId] = messages;
+          if (nextThreadId !== threadId) {
+            hasMutation = true;
+          }
+        }
+      } else {
+        hasMutation = true;
+      }
+    } catch {
+      hasMutation = true;
+    }
+  }
+
+  if (!hasMutation) {
+    return;
+  }
+
+  window.localStorage.setItem(
+    THREAD_STORE_STORAGE_KEY,
+    JSON.stringify(uniqueThreads),
+  );
+
+  if (nextActiveThreadId) {
+    window.localStorage.setItem(
+      ACTIVE_THREAD_ID_STORAGE_KEY,
+      nextActiveThreadId,
+    );
+  } else {
+    window.localStorage.removeItem(ACTIVE_THREAD_ID_STORAGE_KEY);
+  }
+
+  window.localStorage.setItem(
+    THREAD_MESSAGES_STORAGE_KEY,
+    JSON.stringify(normalizedThreadMessages),
+  );
+};
+
 const readThreads = (): ThreadSummary[] => {
   if (!canUseStorage()) {
     return [];
   }
+
+  normalizeThreadStorage();
 
   const raw = window.localStorage.getItem(THREAD_STORE_STORAGE_KEY);
   if (!raw) {
@@ -74,7 +204,10 @@ const readActiveThreadId = (): ThreadId | null => {
     return null;
   }
 
-  return window.localStorage.getItem(ACTIVE_THREAD_ID_STORAGE_KEY);
+  normalizeThreadStorage();
+
+  const activeThreadId = window.localStorage.getItem(ACTIVE_THREAD_ID_STORAGE_KEY);
+  return isUuidThreadId(activeThreadId) ? activeThreadId : null;
 };
 
 const writeActiveThreadId = (threadId: ThreadId | null) => {
@@ -111,7 +244,7 @@ const createThreadSummary = (input: CreateThreadInput = {}): ThreadSummary => {
   const timestamp = nowIso();
 
   return {
-    id: input.id ?? createThreadId(),
+    id: isUuidThreadId(input.id) ? input.id : createThreadId(),
     title: input.title?.trim() || DEFAULT_THREAD_TITLE,
     createdAt: input.createdAt ?? timestamp,
     updatedAt: input.updatedAt ?? timestamp,
