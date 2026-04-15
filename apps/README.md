@@ -14,6 +14,7 @@ docker push <acr-name>.azurecr.io/azure-agent-web:latest
 ```
 
 Environment Variables:
+KEY_VAULT_URL=https://<your-key-vault-name>.vault.azure.net/
 AGENT_API_BASE_URL=http://<your-azure-agent-api-url>
 CORS_ORIGINS=https://<your-swa-domain>
 DEFAULT_USER_ID=dev-user

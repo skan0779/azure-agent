@@ -15,6 +15,7 @@ import type {
 type LocalThreadStore = {
   getState(): ThreadStoreState;
   createThread(input?: CreateThreadInput): ThreadSummary;
+  replaceThreads(threads: ThreadSummary[]): ThreadSummary[];
   updateThread(threadId: ThreadId, patch: UpdateThreadInput): ThreadSummary;
   deleteThread(threadId: ThreadId): void;
   setActiveThread(threadId: ThreadId): void;
@@ -276,6 +277,29 @@ export const localThreadStore: ThreadStore & LocalThreadStore = {
     writeActiveThreadId(thread.id);
 
     return thread;
+  },
+
+  replaceThreads(threads): ThreadSummary[] {
+    const nextThreads = sortThreads(
+      threads
+        .filter(isThreadSummary)
+        .map((thread) => ({
+          ...thread,
+          title: thread.title.trim() || DEFAULT_THREAD_TITLE,
+        })),
+    );
+
+    writeThreads(nextThreads);
+
+    const activeThreadId = readActiveThreadId();
+    if (
+      activeThreadId &&
+      !nextThreads.some((thread) => thread.id === activeThreadId)
+    ) {
+      writeActiveThreadId(nextThreads[0]?.id ?? null);
+    }
+
+    return nextThreads;
   },
 
   updateThread(threadId, patch): ThreadSummary {

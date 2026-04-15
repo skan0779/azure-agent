@@ -2,10 +2,16 @@ import cors from "@fastify/cors";
 import Fastify from "fastify";
 
 import { config } from "./config.js";
-import { chatRoutes } from "./routes/chat.js";
+import { buildChatRoutes } from "./routes/chat.js";
 import { healthRoutes } from "./routes/health.js";
+import { buildThreadsRoutes } from "./routes/threads.js";
+import type { ThreadRepository } from "./lib/thread-repository.js";
 
-export const buildApp = () => {
+export const buildApp = ({
+  threadRepository = null,
+}: {
+  threadRepository?: ThreadRepository | null;
+} = {}) => {
   const app = Fastify({
     logger: true,
   });
@@ -16,7 +22,16 @@ export const buildApp = () => {
   });
 
   void app.register(healthRoutes);
-  void app.register(chatRoutes);
+  void app.register(
+    buildChatRoutes({
+      threadRepository,
+    }),
+  );
+  void app.register(
+    buildThreadsRoutes({
+      threadRepository,
+    }),
+  );
 
   return app;
 };

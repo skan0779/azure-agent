@@ -11,7 +11,7 @@ export const ThreadListSidebar: FC = () => {
         <div className="px-2 pb-3 pt-1">
           <div className="text-sm font-medium text-[#ececec]">azure-agent</div>
           <div className="mt-1 text-xs text-[#9f9f9f]">
-            Local thread history
+            Thread history
           </div>
         </div>
         <ThreadList />

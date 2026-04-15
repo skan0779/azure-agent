@@ -16,8 +16,12 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "r
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import {
+  getThreadMessages,
+  updateThread as updateRemoteThread,
+} from "@/lib/thread-api";
 import { localThreadMessageStore } from "@/lib/thread-message-store.local";
-import { LocalThreadListAdapter } from "@/lib/thread-list-adapter.local";
+import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 import {
   DEFAULT_THREAD_TITLE,
   localThreadStore,
@@ -184,6 +188,26 @@ const useLocalChatThreadRuntime = ({
     },
     onFinish: () => {
       currentJobIdRef.current = null;
+
+      if (!remoteId) {
+        return;
+      }
+
+      void getThreadMessages({
+        apiBaseUrl,
+        userId,
+        threadId: remoteId,
+      })
+        .then((messages) => {
+          localThreadMessageStore.setMessages(remoteId, messages);
+          chat.setMessages(messages);
+        })
+        .catch((error) => {
+          console.warn("Failed to refresh thread messages after finish", {
+            threadId: remoteId,
+            error,
+          });
+        });
     },
     onError: () => {
       currentJobIdRef.current = null;
@@ -218,6 +242,38 @@ const useLocalChatThreadRuntime = ({
   useEffect(() => {
     localThreadMessageStore.setMessages(storageThreadId, chat.messages);
   }, [chat.messages, storageThreadId]);
+
+  useEffect(() => {
+    if (!remoteId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void getThreadMessages({
+      apiBaseUrl,
+      userId,
+      threadId: remoteId,
+    })
+      .then((messages) => {
+        if (cancelled) {
+          return;
+        }
+
+        localThreadMessageStore.setMessages(remoteId, messages);
+        chat.setMessages(messages);
+      })
+      .catch((error) => {
+        console.warn("Failed to load thread messages", {
+          threadId: remoteId,
+          error,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBaseUrl, chat, remoteId, userId]);
 
   useEffect(() => {
     currentJobIdRef.current = null;
@@ -257,11 +313,23 @@ const useLocalChatThreadRuntime = ({
       return;
     }
 
+    const updatedAt = new Date().toISOString();
     localThreadStore.updateThread(remoteId, {
-      updatedAt: new Date().toISOString(),
+      updatedAt,
+    });
+    void updateRemoteThread({
+      apiBaseUrl,
+      userId,
+      threadId: remoteId,
+      updatedAt,
+    }).catch((error) => {
+      console.warn("Failed to update thread timestamp", {
+        threadId: remoteId,
+        error,
+      });
     });
     lastUpdatedUserMessageKeyRef.current = updateKey;
-  }, [latestUserMessageId, remoteId, runtimeThreadKey]);
+  }, [apiBaseUrl, latestUserMessageId, remoteId, runtimeThreadKey, userId]);
 
   const runtime = useAISDKRuntime({
     ...chat,
@@ -288,10 +356,7 @@ const ThreadStoreSync = () => {
 
     if (existing) {
       localThreadStore.setActiveThread(remoteId);
-      return;
     }
-
-    localThreadStore.createThread({ id: remoteId });
   }, [remoteId]);
 
   return null;
@@ -317,6 +382,12 @@ const InitialThreadSwitch = ({
       return;
     }
 
+    const state = getLocalThreadStoreState();
+    if (!state.threads.some((thread) => thread.id === storedThreadId)) {
+      hasSwitchedRef.current = true;
+      return;
+    }
+
     hasSwitchedRef.current = true;
     void aui.threads().switchToThread(storedThreadId);
   }, [aui, isLoading, mainThreadId, storedThreadId]);
@@ -324,7 +395,11 @@ const InitialThreadSwitch = ({
   return null;
 };
 
-const ThreadTitleSync = () => {
+const ThreadTitleSync = ({
+  apiBaseUrl,
+}: {
+  apiBaseUrl: string;
+}) => {
   const aui = useAui();
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const firstUserTitle = useAuiState((s) =>
@@ -367,6 +442,17 @@ const ThreadTitleSync = () => {
       localThreadStore.updateThread(remoteId, {
         titleSource: "first-user-message",
       });
+      void updateRemoteThread({
+        apiBaseUrl,
+        userId: DEFAULT_USER_ID,
+        threadId: remoteId,
+        titleSource: "first-user-message",
+      }).catch((error) => {
+        console.warn("Failed to sync thread title source", {
+          threadId: remoteId,
+          error,
+        });
+      });
       return;
     }
 
@@ -375,7 +461,19 @@ const ThreadTitleSync = () => {
       title: firstUserTitle,
       titleSource: "first-user-message",
     });
-  }, [aui, firstUserTitle, remoteId]);
+    void updateRemoteThread({
+      apiBaseUrl,
+      userId: DEFAULT_USER_ID,
+      threadId: remoteId,
+      title: firstUserTitle,
+      titleSource: "first-user-message",
+    }).catch((error) => {
+      console.warn("Failed to update thread title", {
+        threadId: remoteId,
+        error,
+      });
+    });
+  }, [apiBaseUrl, aui, firstUserTitle, remoteId]);
 
   return null;
 };
@@ -387,7 +485,14 @@ const ChatShellRuntime = ({
   apiBaseUrl: string;
   storedThreadId?: string;
 }) => {
-  const adapter = useMemo(() => new LocalThreadListAdapter(), []);
+  const adapter = useMemo(
+    () =>
+      new RemoteApiThreadListAdapter({
+        apiBaseUrl,
+        userId: DEFAULT_USER_ID,
+      }),
+    [apiBaseUrl],
+  );
 
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: function RuntimeHook() {
@@ -404,7 +509,7 @@ const ChatShellRuntime = ({
     <AssistantRuntimeProvider runtime={runtime}>
       <InitialThreadSwitch storedThreadId={storedThreadId} />
       <ThreadStoreSync />
-      <ThreadTitleSync />
+      <ThreadTitleSync apiBaseUrl={apiBaseUrl} />
       <div className="flex h-dvh bg-[#212121] text-[#ececec]">
         <ThreadListSidebar />
         <main className="min-w-0 flex-1">

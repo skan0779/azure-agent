@@ -10,11 +10,17 @@ import {
   streamAgentEvents,
 } from "../lib/azure-agent-api.js";
 import {
+  buildDynamicToolParts,
+  collectToolSnapshotsFromUpdate,
+  createAutoThreadTitle,
   extractLangChainChunkText,
+  extractLastUserMessage,
   extractLastUserText,
   resolveThreadId,
 } from "../lib/chat.js";
 import { config } from "../config.js";
+import type { ThreadRepository } from "../lib/thread-repository.js";
+import type { UIMessage } from "../lib/thread-history.js";
 
 const chatBodySchema = z.object({
   id: z.string().optional(),
@@ -28,6 +34,10 @@ const cancelBodySchema = z.object({
   jobId: z.string().min(1),
   userId: z.string().min(1).optional(),
 });
+
+const COMPLETED_CANCEL_TTL_MS = 30_000;
+const inFlightJobCancels = new Map<string, Promise<void>>();
+const completedJobCancels = new Map<string, number>();
 
 const isAbortError = (error: unknown): boolean => {
   return (
@@ -55,7 +65,55 @@ const buildStreamCorsHeaders = (
   };
 };
 
-export const chatRoutes: FastifyPluginAsync = async (app) => {
+const cleanupCompletedJobCancels = () => {
+  const now = Date.now();
+
+  for (const [jobId, expiresAt] of completedJobCancels.entries()) {
+    if (expiresAt <= now) {
+      completedJobCancels.delete(jobId);
+    }
+  }
+};
+
+const runJobCancel = async ({
+  jobId,
+  cancel,
+}: {
+  jobId: string;
+  cancel: () => Promise<void>;
+}) => {
+  cleanupCompletedJobCancels();
+
+  const completedAt = completedJobCancels.get(jobId);
+  if (completedAt && completedAt > Date.now()) {
+    return;
+  }
+
+  const inFlight = inFlightJobCancels.get(jobId);
+  if (inFlight) {
+    await inFlight;
+    return;
+  }
+
+  const cancelPromise = (async () => {
+    try {
+      await cancel();
+      completedJobCancels.set(jobId, Date.now() + COMPLETED_CANCEL_TTL_MS);
+    } finally {
+      inFlightJobCancels.delete(jobId);
+    }
+  })();
+
+  inFlightJobCancels.set(jobId, cancelPromise);
+  await cancelPromise;
+};
+
+export const buildChatRoutes = ({
+  threadRepository,
+}: {
+  threadRepository: ThreadRepository | null;
+}): FastifyPluginAsync => {
+  const chatRoutes: FastifyPluginAsync = async (app) => {
   app.post("/api/chat/cancel", async (request, reply) => {
     const parsed = cancelBodySchema.safeParse(request.body);
     if (!parsed.success) {
@@ -84,10 +142,14 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       "Cancelling agent job",
     );
 
-    await cancelAgentJobById({
-      baseUrl: config.agentApiBaseUrl,
+    await runJobCancel({
       jobId: parsed.data.jobId,
-      userId: resolvedUserId,
+      cancel: () =>
+        cancelAgentJobById({
+          baseUrl: config.agentApiBaseUrl,
+          jobId: parsed.data.jobId,
+          userId: resolvedUserId,
+        }),
     });
 
     return {
@@ -109,6 +171,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
 
     const { id, messages, threadId, userId } = parsed.data;
     const lastUserText = extractLastUserText(messages);
+    const lastUserMessage = extractLastUserMessage(messages);
     if (!lastUserText) {
       reply.code(400);
       return {
@@ -128,6 +191,19 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     let activeJob: AgentJobCreateResponse | null = null;
     let isTerminal = false;
     let cancelRequested = false;
+    let assistantMessageId: string | null = null;
+    let assistantText = "";
+    const toolSnapshots = new Map<
+      string,
+      {
+        toolName: string;
+        toolCallId: string;
+        input?: unknown;
+        output?: unknown;
+        errorText?: string;
+        state: "input-available" | "output-available" | "output-error";
+      }
+    >();
 
     const requestJobCancel = async () => {
       if (cancelRequested || isTerminal || !activeJob) {
@@ -135,11 +211,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       }
 
       cancelRequested = true;
+      const job = activeJob;
 
       try {
-        await cancelAgentJob({
-          cancelUrl: activeJob.cancel_url,
-          userId: resolvedUserId,
+        await runJobCancel({
+          jobId: job.job_id,
+          cancel: () =>
+            cancelAgentJob({
+              cancelUrl: job.cancel_url,
+              userId: resolvedUserId,
+            }),
         });
       } catch (error) {
         app.log.warn(
@@ -167,6 +248,32 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
     const stream = createUIMessageStream({
       execute: async ({ writer }) => {
         try {
+          if (threadRepository) {
+            await threadRepository.upsertThread({
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              title: createAutoThreadTitle(lastUserText),
+              updatedAt: new Date().toISOString(),
+              titleSource: "first-user-message",
+            });
+
+            await threadRepository.upsertMessage({
+              threadId: resolvedThreadId,
+              message:
+                lastUserMessage ??
+                ({
+                  id: crypto.randomUUID(),
+                  role: "user",
+                  parts: [
+                    {
+                      type: "text",
+                      text: lastUserText,
+                    },
+                  ],
+                } satisfies UIMessage),
+            });
+          }
+
           app.log.info(
             {
               requestId: request.id,
@@ -215,6 +322,17 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
             signal: abortController.signal,
           });
           activeJob = job;
+
+          if (threadRepository) {
+            await threadRepository.upsertThread({
+              threadId: resolvedThreadId,
+              userId: resolvedUserId,
+              title: createAutoThreadTitle(lastUserText),
+              updatedAt: new Date().toISOString(),
+              lastJobId: job.job_id,
+              titleSource: "first-user-message",
+            });
+          }
 
           app.log.info(
             {
@@ -307,6 +425,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
               }
 
               sawText = true;
+              assistantText += delta;
               writer.write({
                 type: "text-delta",
                 id: textId,
@@ -372,6 +491,16 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
                 event,
               },
             });
+
+            if (event.type === "updates") {
+              const toolChunks = collectToolSnapshotsFromUpdate(
+                event.data,
+                toolSnapshots,
+              );
+              for (const chunk of toolChunks) {
+                writer.write(chunk);
+              }
+            }
           }
 
           isTerminal = true;
@@ -381,6 +510,30 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
               type: "text-end",
               id: textId,
             });
+
+            if (threadRepository && (assistantText.trim() || toolSnapshots.size > 0)) {
+              assistantMessageId ??= crypto.randomUUID();
+              const toolParts = buildDynamicToolParts(toolSnapshots);
+              await threadRepository.upsertMessage({
+                threadId: resolvedThreadId,
+                message: {
+                  id: assistantMessageId,
+                  role: "assistant",
+                  parts: [
+                    ...toolParts,
+                    ...(assistantText.trim()
+                      ? [
+                          {
+                            type: "text" as const,
+                            text: assistantText,
+                            state: "done" as const,
+                          },
+                        ]
+                      : []),
+                  ],
+                },
+              });
+            }
           } else if (!sawText) {
             writer.write({
               type: "data-status",
@@ -457,4 +610,8 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
       request.raw.off("aborted", abortHandler);
     });
   });
+
+  };
+
+  return chatRoutes;
 };

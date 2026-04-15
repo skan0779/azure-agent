@@ -10,13 +10,17 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@azure/identity": "^4.13.1",
+    "@azure/keyvault-secrets": "^4.11.1",
     "@fastify/cors": "^11.1.0",
     "ai": "^6.0.156",
     "fastify": "^5.6.1",
+    "pg": "^8.20.0",
     "zod": "^4.1.12"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",
+    "@types/pg": "^8.20.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }
