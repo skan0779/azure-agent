@@ -248,7 +248,6 @@ const createThreadSummary = (input: CreateThreadInput = {}): ThreadSummary => {
     title: input.title?.trim() || DEFAULT_THREAD_TITLE,
     createdAt: input.createdAt ?? timestamp,
     updatedAt: input.updatedAt ?? timestamp,
-    preview: input.preview,
     lastJobId: input.lastJobId,
     titleSource: input.titleSource ?? "manual",
   };

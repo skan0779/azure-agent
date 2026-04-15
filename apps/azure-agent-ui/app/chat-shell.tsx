@@ -12,7 +12,7 @@ import {
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
 import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
@@ -91,6 +91,53 @@ const getFirstUserMessageTitle = (
   return createAutoThreadTitle(text);
 };
 
+const extractJobId = (value: unknown): string | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  if (!("jobId" in value) || typeof value.jobId !== "string") {
+    return null;
+  }
+
+  return value.jobId;
+};
+
+const cancelChatJob = async ({
+  apiBaseUrl,
+  jobId,
+  userId,
+}: {
+  apiBaseUrl: string;
+  jobId: string;
+  userId: string;
+}) => {
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/chat/cancel`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        jobId,
+        userId,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn("Failed to cancel chat job", {
+        jobId,
+        status: response.status,
+      });
+    }
+  } catch (error) {
+    console.warn("Failed to cancel chat job", {
+      jobId,
+      error,
+    });
+  }
+};
+
 const useLocalChatThreadRuntime = ({
   apiBaseUrl,
   userId,
@@ -101,10 +148,12 @@ const useLocalChatThreadRuntime = ({
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const storageThreadId = remoteId ?? threadId;
+  const runtimeThreadKey = remoteId ?? threadId;
   const initialMessages = useMemo(
     () => localThreadMessageStore.getMessages(storageThreadId),
     [storageThreadId],
   );
+  const currentJobIdRef = useRef<string | null>(null);
 
   const transport = useMemo(
     () =>
@@ -123,13 +172,101 @@ const useLocalChatThreadRuntime = ({
     messages: initialMessages,
     transport,
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    onData: (dataPart) => {
+      if (dataPart.type !== "data-metadata") {
+        return;
+      }
+
+      const jobId = extractJobId(dataPart.data);
+      if (jobId) {
+        currentJobIdRef.current = jobId;
+      }
+    },
+    onFinish: () => {
+      currentJobIdRef.current = null;
+    },
+    onError: () => {
+      currentJobIdRef.current = null;
+    },
   });
+
+  const stop = useCallback(async () => {
+    const jobId = currentJobIdRef.current;
+    currentJobIdRef.current = null;
+
+    await Promise.allSettled([
+      chat.stop(),
+      jobId
+        ? cancelChatJob({
+            apiBaseUrl,
+            jobId,
+            userId,
+          })
+        : Promise.resolve(),
+    ]);
+  }, [apiBaseUrl, chat, userId]);
+
+  const lastObservedUserMessageIdRef = useRef<string | null>(null);
+  const lastUpdatedUserMessageKeyRef = useRef<string | null>(null);
+  const lastRuntimeThreadKeyRef = useRef<string | null>(null);
+
+  const latestUserMessageId =
+    [...chat.messages]
+      .reverse()
+      .find((message) => message.role === "user")?.id ?? null;
 
   useEffect(() => {
     localThreadMessageStore.setMessages(storageThreadId, chat.messages);
   }, [chat.messages, storageThreadId]);
 
-  const runtime = useAISDKRuntime(chat);
+  useEffect(() => {
+    currentJobIdRef.current = null;
+  }, [runtimeThreadKey]);
+
+  useEffect(() => {
+    if (lastRuntimeThreadKeyRef.current !== runtimeThreadKey) {
+      lastRuntimeThreadKeyRef.current = runtimeThreadKey;
+      lastObservedUserMessageIdRef.current = latestUserMessageId;
+      lastUpdatedUserMessageKeyRef.current =
+        remoteId && latestUserMessageId
+          ? `${remoteId}:${latestUserMessageId}`
+          : null;
+      return;
+    }
+
+    if (!latestUserMessageId) {
+      return;
+    }
+
+    const userMessageChanged =
+      lastObservedUserMessageIdRef.current !== latestUserMessageId;
+    if (userMessageChanged) {
+      lastObservedUserMessageIdRef.current = latestUserMessageId;
+    }
+
+    if (!remoteId) {
+      return;
+    }
+
+    const updateKey = `${remoteId}:${latestUserMessageId}`;
+    if (lastUpdatedUserMessageKeyRef.current === updateKey) {
+      return;
+    }
+
+    if (!userMessageChanged && lastUpdatedUserMessageKeyRef.current) {
+      return;
+    }
+
+    localThreadStore.updateThread(remoteId, {
+      updatedAt: new Date().toISOString(),
+    });
+    lastUpdatedUserMessageKeyRef.current = updateKey;
+  }, [latestUserMessageId, remoteId, runtimeThreadKey]);
+
+  const runtime = useAISDKRuntime({
+    ...chat,
+    stop,
+  });
 
   if (transport instanceof AssistantChatTransport) {
     transport.setRuntime(runtime);

@@ -9,7 +9,6 @@ export interface ThreadSummary {
   title: string;
   createdAt: string;
   updatedAt: string;
-  preview?: string;
   lastJobId?: string;
   titleSource?: ThreadTitleSource;
 }
@@ -22,7 +21,6 @@ export interface ThreadStoreState {
 export interface CreateThreadInput {
   id?: ThreadId;
   title?: string;
-  preview?: string;
   createdAt?: string;
   updatedAt?: string;
   lastJobId?: string;
@@ -31,7 +29,6 @@ export interface CreateThreadInput {
 
 export interface UpdateThreadInput {
   title?: string;
-  preview?: string;
   updatedAt?: string;
   lastJobId?: string;
   titleSource?: ThreadTitleSource;
