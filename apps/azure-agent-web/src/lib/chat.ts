@@ -1,18 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-export const resolveThreadId = (
-  ...candidates: Array<string | undefined | null>
-): string => {
-  for (const candidate of candidates) {
-    const value = candidate?.trim();
-    if (!value) {
-      continue;
-    }
-
-    return value;
-  }
-
-  return randomUUID();
+export const resolveThreadId = (threadId?: string | null): string => {
+  const value = threadId?.trim();
+  return value || randomUUID();
 };
 
 const extractTextFromParts = (parts: unknown[]): string | undefined => {

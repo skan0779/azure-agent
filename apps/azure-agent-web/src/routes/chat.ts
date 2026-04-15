@@ -19,7 +19,7 @@ import { config } from "../config.js";
 const chatBodySchema = z.object({
   id: z.string().optional(),
   messages: z.array(z.any()).default([]),
-  threadId: z.string().optional(),
+  threadId: z.string().uuid().optional(),
   userId: z.string().min(1).optional(),
   trigger: z.string().optional(),
 });
@@ -123,7 +123,7 @@ export const chatRoutes: FastifyPluginAsync = async (app) => {
         : undefined;
     const resolvedUserId =
       userId?.trim() || headerUserId?.trim() || config.defaultUserId;
-    const resolvedThreadId = resolveThreadId(threadId, id, resolvedUserId);
+    const resolvedThreadId = resolveThreadId(threadId);
     const abortController = new AbortController();
     let activeJob: AgentJobCreateResponse | null = null;
     let isTerminal = false;

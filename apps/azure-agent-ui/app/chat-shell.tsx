@@ -112,10 +112,10 @@ const useLocalChatThreadRuntime = ({
         api: `${apiBaseUrl}/api/chat`,
         body: {
           userId,
-          threadId,
+          threadId: remoteId,
         },
       }),
-    [apiBaseUrl, threadId, userId],
+    [apiBaseUrl, remoteId, userId],
   );
 
   const chat = useChat({
