@@ -19,78 +19,19 @@ import {
   getThreadMessages,
   updateThread as updateRemoteThread,
 } from "@/lib/thread-api";
+import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
-import {
-  DEFAULT_THREAD_TITLE,
-  localThreadStore,
-} from "@/lib/thread-store.local";
+import { localThreadStore } from "@/lib/thread-store.local";
 
 const DEFAULT_USER_ID = "1015520";
-const AUTO_TITLE_TOKEN_LIMIT = 7;
-
-const getLocalThreadStoreState = () => {
-  return localThreadStore.getState() as Awaited<
-    ReturnType<typeof localThreadStore.getState>
-  >;
-};
 
 const getStoredActiveThreadId = () => {
-  const state = getLocalThreadStoreState();
-
-  if (state.activeThreadId) {
-    const activeThread = state.threads.find(
-      (thread) => thread.id === state.activeThreadId,
-    );
-    if (activeThread) {
-      return activeThread.id;
-    }
+  if (typeof window === "undefined") {
+    return undefined;
   }
 
-  if (state.threads[0]) {
-    localThreadStore.setActiveThread(state.threads[0].id);
-    return state.threads[0].id;
-  }
-
-  return undefined;
-};
-
-const createAutoThreadTitle = (text: string) => {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return DEFAULT_THREAD_TITLE;
-  }
-
-  const tokens = normalized.split(" ");
-  if (tokens.length <= AUTO_TITLE_TOKEN_LIMIT) {
-    return normalized;
-  }
-
-  return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
-};
-
-const getFirstUserMessageTitle = (
-  messages: readonly {
-    role: string;
-    content: readonly { type: string; text?: string }[];
-  }[],
-) => {
-  const firstUserMessage = messages.find((message) => message.role === "user");
-  if (!firstUserMessage) {
-    return null;
-  }
-
-  const text = firstUserMessage.content
-    .filter((part) => part.type === "text" && typeof part.text === "string")
-    .map((part) => part.text?.trim() ?? "")
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
-  if (!text) {
-    return null;
-  }
-
-  return createAutoThreadTitle(text);
+  const stored = window.localStorage.getItem(ACTIVE_THREAD_ID_STORAGE_KEY);
+  return stored?.trim() || undefined;
 };
 
 const extractJobId = (value: unknown): string | null => {
@@ -298,9 +239,6 @@ const useLocalChatThreadRuntime = ({
     }
 
     const updatedAt = new Date().toISOString();
-    localThreadStore.updateThread(remoteId, {
-      updatedAt,
-    });
     void updateRemoteThread({
       apiBaseUrl,
       userId,
@@ -335,12 +273,7 @@ const ThreadStoreSync = () => {
       return;
     }
 
-    const state = getLocalThreadStoreState();
-    const existing = state.threads.find((thread) => thread.id === remoteId);
-
-    if (existing) {
-      localThreadStore.setActiveThread(remoteId);
-    }
+    localThreadStore.setActiveThread(remoteId);
   }, [remoteId]);
 
   return null;
@@ -366,98 +299,9 @@ const InitialThreadSwitch = ({
       return;
     }
 
-    const state = getLocalThreadStoreState();
-    if (!state.threads.some((thread) => thread.id === storedThreadId)) {
-      hasSwitchedRef.current = true;
-      return;
-    }
-
     hasSwitchedRef.current = true;
     void aui.threads().switchToThread(storedThreadId);
   }, [aui, isLoading, mainThreadId, storedThreadId]);
-
-  return null;
-};
-
-const ThreadTitleSync = ({
-  apiBaseUrl,
-}: {
-  apiBaseUrl: string;
-}) => {
-  const aui = useAui();
-  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
-  const firstUserTitle = useAuiState((s) =>
-    getFirstUserMessageTitle(
-      s.thread.messages.map((message) => ({
-        role: message.role,
-        content: message.content.map((part) => ({
-          type: part.type,
-          text: "text" in part ? part.text : undefined,
-        })),
-      })),
-    ),
-  );
-
-  useEffect(() => {
-    if (!remoteId || !firstUserTitle) {
-      return;
-    }
-
-    const state = getLocalThreadStoreState();
-    const thread = state.threads.find((item) => item.id === remoteId);
-    if (!thread) {
-      return;
-    }
-
-    const hasManualTitle =
-      thread.titleSource === "manual" && thread.title !== DEFAULT_THREAD_TITLE;
-    if (hasManualTitle) {
-      return;
-    }
-
-    if (
-      thread.titleSource === "first-user-message" &&
-      thread.title === firstUserTitle
-    ) {
-      return;
-    }
-
-    if (thread.title === firstUserTitle) {
-      localThreadStore.updateThread(remoteId, {
-        titleSource: "first-user-message",
-      });
-      void updateRemoteThread({
-        apiBaseUrl,
-        userId: DEFAULT_USER_ID,
-        threadId: remoteId,
-        titleSource: "first-user-message",
-      }).catch((error) => {
-        console.warn("Failed to sync thread title source", {
-          threadId: remoteId,
-          error,
-        });
-      });
-      return;
-    }
-
-    aui.threads().item("main").rename(firstUserTitle);
-    localThreadStore.updateThread(remoteId, {
-      title: firstUserTitle,
-      titleSource: "first-user-message",
-    });
-    void updateRemoteThread({
-      apiBaseUrl,
-      userId: DEFAULT_USER_ID,
-      threadId: remoteId,
-      title: firstUserTitle,
-      titleSource: "first-user-message",
-    }).catch((error) => {
-      console.warn("Failed to update thread title", {
-        threadId: remoteId,
-        error,
-      });
-    });
-  }, [apiBaseUrl, aui, firstUserTitle, remoteId]);
 
   return null;
 };
@@ -493,7 +337,6 @@ const ChatShellRuntime = ({
     <AssistantRuntimeProvider runtime={runtime}>
       <InitialThreadSwitch storedThreadId={storedThreadId} />
       <ThreadStoreSync />
-      <ThreadTitleSync apiBaseUrl={apiBaseUrl} />
       <div className="flex h-dvh bg-[#212121] text-[#ececec]">
         <ThreadListSidebar />
         <main className="min-w-0 flex-1">

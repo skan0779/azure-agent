@@ -6,7 +6,7 @@ import {
   listThreads,
   updateThread,
 } from "@/lib/thread-api";
-import { DEFAULT_THREAD_TITLE, localThreadStore } from "@/lib/thread-store.local";
+import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store.local";
 
 type RemoteThreadInitializeResponse = {
   remoteId: string;
@@ -46,7 +46,6 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
 
   async list(): Promise<RemoteThreadListResponse> {
     const threads = await listThreads(this.options);
-    localThreadStore.replaceThreads(threads);
 
     return {
       threads: threads.map(toMetadata),
@@ -54,17 +53,11 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
   }
 
   async rename(remoteId: string, newTitle: string): Promise<void> {
-    const thread = await updateThread({
+    await updateThread({
       ...this.options,
       threadId: remoteId,
       title: newTitle,
       titleSource: "manual",
-    });
-    localThreadStore.updateThread(thread.id, {
-      title: thread.title,
-      updatedAt: thread.updatedAt,
-      titleSource: thread.titleSource,
-      lastJobId: thread.lastJobId,
     });
   }
 
@@ -81,33 +74,15 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
       ...this.options,
       threadId: remoteId,
     });
-    localThreadStore.deleteThread(remoteId);
   }
 
-  async initialize(threadId: string): Promise<RemoteThreadInitializeResponse> {
-    const state = await localThreadStore.getState();
-    const existing = state.threads.find((thread) => thread.id === threadId);
-
-    if (existing) {
-      localThreadStore.setActiveThread(existing.id);
-      return {
-        remoteId: existing.id,
-        externalId: undefined,
-      };
-    }
+  async initialize(_threadId: string): Promise<RemoteThreadInitializeResponse> {
+    void _threadId;
 
     const created = await createThread({
       ...this.options,
       title: DEFAULT_THREAD_TITLE,
       titleSource: "manual",
-    });
-    localThreadStore.createThread({
-      id: created.id,
-      title: created.title,
-      createdAt: created.createdAt,
-      updatedAt: created.updatedAt,
-      lastJobId: created.lastJobId,
-      titleSource: created.titleSource,
     });
 
     return {
@@ -122,7 +97,6 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
 
   async fetch(threadId: string): Promise<RemoteThreadMetadata> {
     const threads = await listThreads(this.options);
-    localThreadStore.replaceThreads(threads);
     const thread = threads.find((item) => item.id === threadId);
 
     if (!thread) {
@@ -132,18 +106,9 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
         title: DEFAULT_THREAD_TITLE,
         titleSource: "manual",
       });
-      localThreadStore.createThread({
-        id: created.id,
-        title: created.title,
-        createdAt: created.createdAt,
-        updatedAt: created.updatedAt,
-        lastJobId: created.lastJobId,
-        titleSource: created.titleSource,
-      });
       return toMetadata(created);
     }
 
-    localThreadStore.setActiveThread(thread.id);
     return toMetadata(thread);
   }
 }

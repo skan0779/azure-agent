@@ -2,9 +2,23 @@ import { randomUUID } from "node:crypto";
 import type { UIMessage } from "./thread-history.js";
 import { uiMessageSchema } from "./thread-history.js";
 
-export const resolveThreadId = (threadId?: string | null): string => {
-  const value = threadId?.trim();
-  return value || randomUUID();
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeUuid = (value?: string | null): string | undefined => {
+  const trimmed = value?.trim();
+  if (!trimmed || !UUID_REGEX.test(trimmed)) {
+    return undefined;
+  }
+
+  return trimmed;
+};
+
+export const resolveThreadId = (
+  threadId?: string | null,
+  fallbackId?: string | null,
+): string => {
+  return normalizeUuid(threadId) ?? normalizeUuid(fallbackId) ?? randomUUID();
 };
 
 const AUTO_TITLE_TOKEN_LIMIT = 7;

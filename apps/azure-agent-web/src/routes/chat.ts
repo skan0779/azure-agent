@@ -54,7 +54,7 @@ const buildStreamCorsHeaders = (
     return {};
   }
 
-  if (!config.corsOrigins.includes(origin)) {
+  if (!config.isCorsOriginAllowed(origin)) {
     return {};
   }
 
@@ -186,7 +186,7 @@ export const buildChatRoutes = ({
         : undefined;
     const resolvedUserId =
       userId?.trim() || headerUserId?.trim() || config.defaultUserId;
-    const resolvedThreadId = resolveThreadId(threadId);
+    const resolvedThreadId = resolveThreadId(threadId, id);
     const abortController = new AbortController();
     let activeJob: AgentJobCreateResponse | null = null;
     let isTerminal = false;

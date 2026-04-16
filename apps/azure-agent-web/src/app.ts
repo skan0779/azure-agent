@@ -17,8 +17,17 @@ export const buildApp = ({
   });
 
   void app.register(cors, {
-    origin: config.corsOrigins,
+    origin(origin, callback) {
+      if (!origin || config.isCorsOriginAllowed(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    },
     credentials: true,
+    allowedHeaders: ["Content-Type", "X-User-Id"],
+    methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
 
   void app.register(healthRoutes);
