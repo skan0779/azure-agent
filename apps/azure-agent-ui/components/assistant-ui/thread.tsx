@@ -61,24 +61,19 @@ const EmptyThreadView: FC = () => {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex h-full w-full max-w-5xl flex-1 items-center justify-center px-4 pb-8 pt-12">
         <div className="w-full max-w-4xl">
-          <div className="mb-10 flex flex-col items-start text-left">
-            <p className="text-3xl font-medium tracking-tight text-white">
-              Hello there!
-            </p>
-            <p className="mt-3 text-3xl tracking-tight text-[#9f9f9f]">
-              How can I help you today?
-            </p>
-          </div>
-
           <div className="mx-auto max-w-3xl">
+            <div className="mb-10 flex flex-col items-start text-left">
+              <p className="text-3xl font-medium tracking-tight text-white">
+                Hello there!
+              </p>
+              <p className="mt-3 text-3xl tracking-tight text-[#9f9f9f]">
+                How can I help you today?
+              </p>
+            </div>
             <EmptyComposer />
           </div>
 
           <div className="mx-auto mt-6 grid max-w-3xl gap-3 sm:grid-cols-2">
-            <EmptySuggestionChip
-              icon={<ImageIcon className="size-4" />}
-              label="Create image"
-            />
             <EmptySuggestionChip
               icon={<LightbulbIcon className="size-4" />}
               label="Help me learn"
@@ -86,10 +81,6 @@ const EmptyThreadView: FC = () => {
             <EmptySuggestionChip
               icon={<PenLineIcon className="size-4" />}
               label="Write anything"
-            />
-            <EmptySuggestionChip
-              icon={<SparklesIcon className="size-4" />}
-              label="Boost my day"
             />
           </div>
 
