@@ -112,7 +112,7 @@ export const Sidebar = ({
           data-mobile="true"
           data-state={openMobile ? "open" : "closed"}
           className={cn(
-            "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-black/20 transition-transform duration-200 md:hidden",
+            "fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-white/10 bg-[#171717]/95 backdrop-blur-md transition-transform duration-200 md:hidden",
             openMobile ? "translate-x-0" : "-translate-x-full",
             className,
           )}
@@ -128,7 +128,7 @@ export const Sidebar = ({
       data-slot="sidebar"
       data-state={open ? "open" : "collapsed"}
       className={cn(
-        "hidden h-dvh shrink-0 overflow-hidden bg-black/20 transition-[width] duration-200 md:flex",
+        "hidden h-dvh shrink-0 overflow-hidden bg-[#171717]/95 backdrop-blur-md transition-[width] duration-200 md:flex",
         open ? "w-72 border-r border-white/10" : "w-0 border-r-0",
         className,
       )}
