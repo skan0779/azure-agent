@@ -16,11 +16,21 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useSidebar } from "@/components/ui/sidebar";
 
 export const ThreadList: FC = () => {
+  const { isMobile, setOpenMobile } = useSidebar();
+
   return (
     <ThreadListPrimitive.Root className="flex h-full flex-col">
-      <ThreadListPrimitive.New className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-medium text-[#ececec] transition hover:bg-white/10 data-[active=true]:bg-white/10">
+      <ThreadListPrimitive.New
+        className="flex w-full items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left text-sm font-medium text-[#ececec] transition hover:bg-white/10 data-[active=true]:bg-white/10"
+        onClick={() => {
+          if (isMobile) {
+            setOpenMobile(false);
+          }
+        }}
+      >
         <PlusIcon className="size-4 shrink-0" />
         <span>New chat</span>
       </ThreadListPrimitive.New>
@@ -53,6 +63,7 @@ const ThreadListSkeleton: FC = () => {
 
 const ThreadListItem: FC = () => {
   const aui = useAui();
+  const { isMobile, setOpenMobile } = useSidebar();
   const title = useAuiState((s) => s.threadListItem.title ?? "New chat");
   const status = useAuiState((s) => s.threadListItem.status);
   const isMain = useAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
@@ -80,7 +91,14 @@ const ThreadListItem: FC = () => {
   return (
     <ThreadListItemPrimitive.Root className="group/thread-item">
       <div className="flex items-center gap-1">
-        <ThreadListItemPrimitive.Trigger className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]">
+        <ThreadListItemPrimitive.Trigger
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]"
+          onClick={() => {
+            if (isMobile) {
+              setOpenMobile(false);
+            }
+          }}
+        >
           <MessageSquareText className="size-4 shrink-0 opacity-70" />
           <div
             className={cn(

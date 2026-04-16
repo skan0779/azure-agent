@@ -76,7 +76,10 @@ export const SidebarProvider = ({
 
   return (
     <SidebarContext.Provider value={value}>
-      <div data-slot="sidebar-wrapper" className="flex min-h-dvh w-full">
+      <div
+        data-slot="sidebar-wrapper"
+        className="flex h-dvh w-full overflow-hidden"
+      >
         {children}
       </div>
     </SidebarContext.Provider>
@@ -168,7 +171,7 @@ export const SidebarInset = ({
   return (
     <div
       data-slot="sidebar-inset"
-      className={cn("relative flex min-w-0 flex-1 flex-col", className)}
+      className={cn("relative flex min-h-0 min-w-0 flex-1 flex-col", className)}
       {...props}
     />
   );
