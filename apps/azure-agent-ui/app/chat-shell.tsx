@@ -118,10 +118,9 @@ const useLocalChatThreadRuntime = ({
         api: `${apiBaseUrl}/api/chat`,
         body: {
           userId,
-          threadId: remoteId,
         },
       }),
-    [apiBaseUrl, remoteId, userId],
+    [apiBaseUrl, userId],
   );
 
   const chat = useChat({
@@ -409,13 +408,39 @@ const ChatShellRuntime = ({
     <AssistantRuntimeProvider runtime={runtime}>
       <InitialThreadSwitch storedThreadId={storedThreadId} />
       <ThreadStoreSync />
-      <div className="flex h-dvh bg-[#212121] text-[#ececec]">
-        <ThreadListSidebar />
-        <main className="min-w-0 flex-1">
-          <Assistant />
-        </main>
-      </div>
+      <ChatShellLayout storedThreadId={storedThreadId} />
     </AssistantRuntimeProvider>
+  );
+};
+
+const ChatShellLayout = ({
+  storedThreadId,
+}: {
+  storedThreadId?: string;
+}) => {
+  const isLoading = useAuiState((s) => s.threads.isLoading);
+  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  const threadIds = useAuiState((s) => s.threads.threadIds);
+
+  const isRestoringStoredThread =
+    !!storedThreadId &&
+    !isLoading &&
+    threadIds.includes(storedThreadId) &&
+    mainThreadId !== storedThreadId;
+
+  return (
+    <div className="flex h-dvh bg-[#212121] text-[#ececec]">
+      <ThreadListSidebar />
+      <main className="min-w-0 flex-1">
+        {isRestoringStoredThread ? (
+          <div className="flex h-dvh items-center justify-center text-sm text-[#9f9f9f]">
+            Loading thread...
+          </div>
+        ) : (
+          <Assistant />
+        )}
+      </main>
+    </div>
   );
 };
 
