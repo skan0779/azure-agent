@@ -157,7 +157,13 @@ const UserMessage: FC = () => {
               </AuiIf>
             </TooltipIconButton>
           </ActionBarPrimitive.Copy>
-          <AuiIf condition={(s) => s.message.isLast}>
+          <AuiIf
+            condition={(s) =>
+              s.message.isLast ||
+              (s.message.index === s.thread.messages.length - 2 &&
+                s.thread.messages.at(-1)?.role === "assistant")
+            }
+          >
             <ActionBarPrimitive.Edit asChild>
               <TooltipIconButton tooltip="Edit" className="text-[#b4b4b4]">
                 <PencilIcon />
