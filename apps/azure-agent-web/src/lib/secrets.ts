@@ -5,7 +5,7 @@ export type WebSecrets = {
   postgresConnString: string;
 };
 
-const POSTGRES_CONN_STRING_SECRET_NAME = "POSTGRES-CONN-STRING";
+const POSTGRES_CONN_STRING_SECRET_NAME = "POSTGRES-WEB-CONN-STRING";
 
 export const loadWebSecrets = async ({
   keyVaultUrl,

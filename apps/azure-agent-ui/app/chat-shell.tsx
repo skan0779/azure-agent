@@ -11,7 +11,6 @@ import {
   AssistantChatTransport,
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
-import { lastAssistantMessageIsCompleteWithToolCalls } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
@@ -175,7 +174,6 @@ const useLocalChatThreadRuntime = ({
     id: threadId,
     messages: initialMessages,
     transport,
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     onData: (dataPart) => {
       if (dataPart.type !== "data-metadata") {
         return;
