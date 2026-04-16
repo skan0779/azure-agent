@@ -205,7 +205,27 @@ const AssistantMessage: FC = () => {
               return null;
             }}
           </MessagePrimitive.Parts>
-          <AuiIf condition={(s) => s.thread.isRunning && s.message.content.length === 0}>
+          <AuiIf
+            condition={(s) => {
+              if (!s.thread.isRunning) {
+                return false;
+              }
+
+              return !s.message.content.some((part) => {
+                if (!part || typeof part !== "object" || !("type" in part)) {
+                  return false;
+                }
+
+                if (part.type === "text") {
+                  return "text" in part && typeof part.text === "string"
+                    ? part.text.trim().length > 0
+                    : false;
+                }
+
+                return part.type === "tool-call" || part.type === "file";
+              });
+            }}
+          >
             <div className="mt-2 flex items-center gap-2 text-[#9f9f9f]">
               <LoaderIcon className="size-4 animate-spin" />
               <span className="text-sm">Thinking...</span>
