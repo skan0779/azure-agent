@@ -19,15 +19,20 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
   ExternalLinkIcon,
   FileTextIcon,
+  ImageIcon,
+  LightbulbIcon,
   LoaderIcon,
   PencilIcon,
+  PenLineIcon,
   PlusIcon,
   RotateCcwIcon,
+  SparklesIcon,
   SquareIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -55,22 +60,63 @@ export const Thread: FC = () => {
 const EmptyThreadView: FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-1 items-center justify-center px-2 pb-6 pt-16">
-        <div className="w-full max-w-3xl">
-          <div className="flex flex-col items-center">
-          <Avatar className="flex h-12 w-12 items-center justify-center rounded-3xl border shadow dark:border-white/15">
-            <AvatarFallback>C</AvatarFallback>
-          </Avatar>
-            <p className="mt-4 text-xl dark:text-white">
-              How can I help you today?
+      <div className="mx-auto flex h-full w-full max-w-5xl flex-1 items-center justify-center px-4 pb-8 pt-12">
+        <div className="w-full max-w-4xl">
+          <div className="mb-10 flex flex-col items-center text-center">
+            <div className="mb-5 flex size-14 items-center justify-center rounded-full bg-white/5 text-white shadow-sm ring-1 ring-white/10">
+              <SparklesIcon className="size-6" />
+            </div>
+            <p className="text-3xl font-medium tracking-tight text-white">
+              Hello there
+            </p>
+            <p className="mt-3 text-3xl tracking-tight text-[#9f9f9f]">
+              Where would you like to start?
             </p>
           </div>
-          <Composer />
-          <p className="mt-4 text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
+
+          <div className="mx-auto max-w-3xl">
+            <EmptyComposer />
+          </div>
+
+          <div className="mx-auto mt-6 grid max-w-3xl gap-3 sm:grid-cols-2">
+            <EmptySuggestionChip
+              icon={<ImageIcon className="size-4" />}
+              label="Create image"
+            />
+            <EmptySuggestionChip
+              icon={<LightbulbIcon className="size-4" />}
+              label="Help me learn"
+            />
+            <EmptySuggestionChip
+              icon={<PenLineIcon className="size-4" />}
+              label="Write anything"
+            />
+            <EmptySuggestionChip
+              icon={<SparklesIcon className="size-4" />}
+              label="Boost my day"
+            />
+          </div>
+
+          <p className="mt-6 text-center text-muted-foreground text-xs dark:text-[#8f8f8f]">
             Agent can make mistakes. Check important info.
           </p>
         </div>
       </div>
+    </div>
+  );
+};
+
+const EmptySuggestionChip = ({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) => {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-[#d6d6d6] shadow-sm transition hover:bg-white/8">
+      <div className="text-[#bdbdbd]">{icon}</div>
+      <span>{label}</span>
     </div>
   );
 };
@@ -138,6 +184,56 @@ const Composer: FC = () => {
             <SquareIcon className="size-3 fill-current dark:text-black" />
           </ComposerPrimitive.Cancel>
         </AuiIf>
+      </div>
+    </ComposerPrimitive.Root>
+  );
+};
+
+const EmptyComposer: FC = () => {
+  return (
+    <ComposerPrimitive.Root className="w-full rounded-[2rem] border border-white/10 bg-white/5 p-3 shadow-[0_12px_40px_-24px_rgba(0,0,0,0.8)] backdrop-blur-sm">
+      <AuiIf condition={(s) => s.composer.attachments.length > 0}>
+        <div className="mb-2 flex flex-row flex-wrap gap-2">
+          <ComposerPrimitive.Attachments
+            components={{ Attachment: ChatGPTAttachmentUI }}
+          />
+        </div>
+      </AuiIf>
+
+      <ComposerPrimitive.Input
+        placeholder="Ask anything"
+        className="min-h-16 w-full resize-none bg-transparent px-3 py-2 text-[15px] text-foreground outline-none placeholder:text-muted-foreground dark:text-white dark:placeholder:text-white/50"
+      />
+
+      <div className="mt-2 flex items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2">
+          <ComposerPrimitive.AddAttachment className="flex size-9 items-center justify-center rounded-full text-[#cfcfcf] transition hover:bg-white/10 hover:text-white">
+            <PlusIcon className="size-4" />
+          </ComposerPrimitive.AddAttachment>
+          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cfcfcf]">
+            <SparklesIcon className="size-4" />
+            <span>Tools</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cfcfcf] sm:flex">
+            <span>Agent</span>
+            <ChevronDownIcon className="size-4" />
+          </div>
+
+          <AuiIf condition={(s) => !s.thread.isRunning}>
+            <ComposerPrimitive.Send className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-opacity disabled:opacity-30">
+              <ArrowUpIcon className="size-4" />
+            </ComposerPrimitive.Send>
+          </AuiIf>
+
+          <AuiIf condition={(s) => s.thread.isRunning}>
+            <ComposerPrimitive.Cancel className="flex size-9 items-center justify-center rounded-full bg-white text-black">
+              <SquareIcon className="size-3 fill-current" />
+            </ComposerPrimitive.Cancel>
+          </AuiIf>
+        </div>
       </div>
     </ComposerPrimitive.Root>
   );
