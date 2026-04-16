@@ -43,36 +43,6 @@ export const listThreads = async ({
   return (await response.json()) as ThreadSummary[];
 };
 
-export const createThread = async ({
-  apiBaseUrl,
-  userId,
-  id,
-  title,
-  titleSource,
-}: {
-  apiBaseUrl: string;
-  userId: string;
-  id?: string;
-  title?: string;
-  titleSource?: ThreadTitleSource;
-}): Promise<ThreadSummary> => {
-  const response = await fetch(`${apiBaseUrl}/api/threads`, {
-    method: "POST",
-    headers: buildHeaders(userId),
-    body: JSON.stringify({
-      id,
-      title,
-      titleSource,
-    }),
-  });
-
-  if (!response.ok) {
-    throw new Error(await parseError(response));
-  }
-
-  return (await response.json()) as ThreadSummary;
-};
-
 export const updateThread = async ({
   apiBaseUrl,
   userId,

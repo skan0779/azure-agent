@@ -25,19 +25,6 @@ export const getThreadMessagesRoute = {
   responseSchema: listThreadMessagesResponseSchema,
 };
 
-export const createThreadBodySchema = z.object({
-  id: threadIdSchema.optional(),
-  title: z.string().min(1).optional(),
-  titleSource: threadTitleSourceSchema.optional(),
-});
-
-export const createThreadRoute = {
-  method: "POST" as const,
-  url: "/api/threads",
-  bodySchema: createThreadBodySchema,
-  responseSchema: threadSummarySchema,
-};
-
 export const updateThreadParamsSchema = z.object({
   threadId: threadIdSchema,
 });
@@ -66,6 +53,5 @@ export const deleteThreadRoute = {
 export type GetThreadMessagesParams = z.infer<
   typeof getThreadMessagesParamsSchema
 >;
-export type CreateThreadBody = z.infer<typeof createThreadBodySchema>;
 export type UpdateThreadParams = z.infer<typeof updateThreadParamsSchema>;
 export type UpdateThreadBody = z.infer<typeof updateThreadBodySchema>;

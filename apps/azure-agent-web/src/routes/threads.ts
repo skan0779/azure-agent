@@ -3,7 +3,6 @@ import type { FastifyPluginAsync } from "fastify";
 import { config } from "../config.js";
 import type { ThreadRepository } from "../lib/thread-repository.js";
 import {
-  createThreadRoute,
   deleteThreadRoute,
   getThreadMessagesRoute,
   listThreadsRoute,
@@ -34,39 +33,6 @@ export const buildThreadsRoutes = ({
       const userId = resolveUserId(request.headers["x-user-id"]);
       const threads = await threadRepository.listThreadsForUser(userId);
       return threads;
-    });
-
-    app.post(createThreadRoute.url, async (request, reply) => {
-      if (!threadRepository) {
-        reply.code(503);
-        return {
-          error: "service_unavailable",
-          detail: "Thread storage is not configured",
-        };
-      }
-
-      const parsed = createThreadRoute.bodySchema.safeParse(request.body);
-      if (!parsed.success) {
-        reply.code(400);
-        return {
-          error: "invalid_request",
-          detail: parsed.error.flatten(),
-        };
-      }
-
-      const userId = resolveUserId(request.headers["x-user-id"]);
-      const now = new Date().toISOString();
-      const title = parsed.data.title?.trim() || "New chat";
-      const thread = await threadRepository.upsertThread({
-        threadId: parsed.data.id ?? crypto.randomUUID(),
-        userId,
-        title,
-        updatedAt: now,
-        titleSource: parsed.data.titleSource ?? "generated",
-      });
-
-      reply.code(201);
-      return thread;
     });
 
     app.get(getThreadMessagesRoute.url, async (request, reply) => {
