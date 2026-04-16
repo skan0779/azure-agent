@@ -42,31 +42,53 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
-      <ThreadPrimitive.Viewport className="aui-scrollbar flex grow flex-col gap-8 overflow-y-auto pt-16">
-        <AuiIf condition={(s) => s.thread.isEmpty}>
-          <div className="flex grow flex-col items-center justify-center">
-            <Avatar className="flex h-12 w-12 items-center justify-center rounded-3xl border shadow dark:border-white/15">
-              <AvatarFallback>C</AvatarFallback>
-            </Avatar>
-            <p className="mt-4 text-xl dark:text-white">
-              How can I help you today?
-            </p>
-          </div>
-        </AuiIf>
+      <AuiIf condition={(s) => s.thread.isEmpty}>
+        <EmptyThreadView />
+      </AuiIf>
+      <AuiIf condition={(s) => !s.thread.isEmpty}>
+        <ConversationThreadView />
+      </AuiIf>
+    </ThreadPrimitive.Root>
+  );
+};
 
-        <ThreadPrimitive.Messages>
-          {() => <ThreadMessage />}
-        </ThreadPrimitive.Messages>
+const EmptyThreadView: FC = () => {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-1 flex-col px-2 pb-6 pt-16">
+        <div className="flex flex-1 flex-col items-center justify-center">
+          <Avatar className="flex h-12 w-12 items-center justify-center rounded-3xl border shadow dark:border-white/15">
+            <AvatarFallback>C</AvatarFallback>
+          </Avatar>
+          <p className="mt-4 text-xl dark:text-white">How can I help you today?</p>
+        </div>
 
-        <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 dark:bg-[#212121]">
-          <ThreadScrollToBottom />
+        <div className="mx-auto w-full max-w-3xl">
           <Composer />
-          <p className="text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
+          <p className="mt-4 text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
             Agent can make mistakes. Check important info.
           </p>
-        </ThreadPrimitive.ViewportFooter>
-      </ThreadPrimitive.Viewport>
-    </ThreadPrimitive.Root>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ConversationThreadView: FC = () => {
+  return (
+    <ThreadPrimitive.Viewport className="aui-scrollbar flex grow flex-col gap-8 overflow-y-auto pt-16">
+      <ThreadPrimitive.Messages>
+        {() => <ThreadMessage />}
+      </ThreadPrimitive.Messages>
+
+      <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 dark:bg-[#212121]">
+        <ThreadScrollToBottom />
+        <Composer />
+        <p className="text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
+          Agent can make mistakes. Check important info.
+        </p>
+      </ThreadPrimitive.ViewportFooter>
+    </ThreadPrimitive.Viewport>
   );
 };
 
