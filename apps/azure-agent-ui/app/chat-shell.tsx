@@ -16,6 +16,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
 import { getThreadMessages } from "@/lib/thread-api";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store";
@@ -465,18 +470,23 @@ const ChatShellLayout = ({
   isInitialThreadResolved: boolean;
 }) => {
   return (
-    <div className="flex h-dvh bg-[#212121] text-[#ececec]">
+    <SidebarProvider defaultOpen>
       <ThreadListSidebar />
-      <main className="min-w-0 flex-1">
-        {!isInitialThreadResolved ? (
-          <div className="flex h-dvh items-center justify-center text-sm text-[#9f9f9f]">
-            Loading thread...
-          </div>
-        ) : (
-          <Assistant />
-        )}
-      </main>
-    </div>
+      <SidebarInset className="bg-[#212121] text-[#ececec]">
+        <div className="flex h-14 items-center border-b border-white/10 px-3">
+          <SidebarTrigger className="text-[#bcbcbc] hover:bg-white/10 hover:text-[#f2f2f2]" />
+        </div>
+        <main className="min-h-0 flex-1">
+          {!isInitialThreadResolved ? (
+            <div className="flex h-full items-center justify-center text-sm text-[#9f9f9f]">
+              Loading thread...
+            </div>
+          ) : (
+            <Assistant />
+          )}
+        </main>
+      </SidebarInset>
+    </SidebarProvider>
   );
 };
 
