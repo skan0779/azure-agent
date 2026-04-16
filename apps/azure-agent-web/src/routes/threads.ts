@@ -62,7 +62,7 @@ export const buildThreadsRoutes = ({
         userId,
         title,
         updatedAt: now,
-        titleSource: parsed.data.titleSource ?? "manual",
+        titleSource: parsed.data.titleSource ?? "generated",
       });
 
       reply.code(201);

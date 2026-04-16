@@ -5,6 +5,7 @@ import {
   AssistantRuntimeProvider,
   useAui,
   useAuiState,
+  useAssistantRuntime,
   useRemoteThreadListRuntime,
 } from "@assistant-ui/react";
 import {
@@ -88,6 +89,7 @@ const useLocalChatThreadRuntime = ({
   apiBaseUrl: string;
   userId: string;
 }) => {
+  const assistantRuntime = useAssistantRuntime();
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const runtimeThreadKey = remoteId ?? threadId;
@@ -181,7 +183,24 @@ const useLocalChatThreadRuntime = ({
       .find((message) => message.role === "user")?.id ?? null;
 
   useEffect(() => {
+    if (remoteId) {
+      return;
+    }
+
+    void assistantRuntime.threads.mainItem.initialize().catch((error) => {
+      console.warn("Failed to initialize remote thread", {
+        threadId,
+        error,
+      });
+    });
+  }, [assistantRuntime, remoteId, threadId]);
+
+  useEffect(() => {
     if (!remoteId) {
+      return;
+    }
+
+    if (chat.messages.length > 0) {
       return;
     }
 
@@ -190,15 +209,15 @@ const useLocalChatThreadRuntime = ({
     void syncMessagesFromServer(remoteId, {
       context: "load thread messages",
     }).then(() => {
-        if (cancelled) {
-          return;
-        }
-      });
+      if (cancelled) {
+        return;
+      }
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [remoteId, syncMessagesFromServer]);
+  }, [chat.messages.length, remoteId, syncMessagesFromServer]);
 
   useEffect(() => {
     currentJobIdRef.current = null;

@@ -82,7 +82,7 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
     const created = await createThread({
       ...this.options,
       title: DEFAULT_THREAD_TITLE,
-      titleSource: "manual",
+      titleSource: "generated",
     });
 
     return {
@@ -104,7 +104,7 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
         ...this.options,
         id: threadId,
         title: DEFAULT_THREAD_TITLE,
-        titleSource: "manual",
+        titleSource: "generated",
       });
       return toMetadata(created);
     }
