@@ -1,12 +1,10 @@
 import type { RemoteThreadListAdapter } from "@assistant-ui/react";
 
 import {
-  createThread,
   deleteThread,
   listThreads,
   updateThread,
 } from "@/lib/thread-api";
-import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store.local";
 
 type RemoteThreadInitializeResponse = {
   remoteId: string;
@@ -79,14 +77,8 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
   async initialize(_threadId: string): Promise<RemoteThreadInitializeResponse> {
     void _threadId;
 
-    const created = await createThread({
-      ...this.options,
-      title: DEFAULT_THREAD_TITLE,
-      titleSource: "generated",
-    });
-
     return {
-      remoteId: created.id,
+      remoteId: crypto.randomUUID(),
       externalId: undefined,
     };
   }

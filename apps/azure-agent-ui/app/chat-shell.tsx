@@ -12,21 +12,15 @@ import {
   AssistantChatTransport,
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
-import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
-import {
-  getThreadMessages,
-  updateThread as updateRemoteThread,
-} from "@/lib/thread-api";
-import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store.local";
+import { getThreadMessages } from "@/lib/thread-api";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
-import { localThreadStore } from "@/lib/thread-store.local";
 
 const DEFAULT_USER_ID = "1015520";
-const AUTO_TITLE_TOKEN_LIMIT = 7;
 
 const getStoredActiveThreadId = () => {
   if (typeof window === "undefined") {
@@ -49,18 +43,20 @@ const extractJobId = (value: unknown): string | null => {
   return value.jobId;
 };
 
-const createAutoThreadTitle = (text: string): string => {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return DEFAULT_THREAD_TITLE;
+const setStoredActiveThreadId = (threadId: string) => {
+  if (typeof window === "undefined") {
+    return;
   }
 
-  const tokens = normalized.split(" ");
-  if (tokens.length <= AUTO_TITLE_TOKEN_LIMIT) {
-    return normalized;
+  window.localStorage.setItem(ACTIVE_THREAD_ID_STORAGE_KEY, threadId);
+};
+
+const clearStoredActiveThreadId = () => {
+  if (typeof window === "undefined") {
+    return;
   }
 
-  return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
+  window.localStorage.removeItem(ACTIVE_THREAD_ID_STORAGE_KEY);
 };
 
 const cancelChatJob = async ({
@@ -108,9 +104,17 @@ const useLocalChatThreadRuntime = ({
   const assistantRuntime = useAssistantRuntime();
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
-  const currentTitle = useAuiState((s) => s.threadListItem.title);
   const runtimeThreadKey = remoteId ?? threadId;
+  const chatStoreThreadIdRef = useRef<string | null>(null);
+  const chatStoreKeyRef = useRef<string>("");
   const currentJobIdRef = useRef<string | null>(null);
+
+  if (chatStoreThreadIdRef.current !== threadId) {
+    chatStoreThreadIdRef.current = threadId;
+    chatStoreKeyRef.current = remoteId ?? `draft:${threadId}`;
+  }
+
+  const chatStoreKey = chatStoreKeyRef.current;
 
   const transport = useMemo(
     () =>
@@ -124,7 +128,7 @@ const useLocalChatThreadRuntime = ({
   );
 
   const chat = useChat({
-    id: threadId,
+    id: chatStoreKey,
     messages: [],
     transport,
     onData: (dataPart) => {
@@ -136,6 +140,7 @@ const useLocalChatThreadRuntime = ({
       if (jobId) {
         currentJobIdRef.current = jobId;
       }
+
     },
     onFinish: () => {
       currentJobIdRef.current = null;
@@ -197,15 +202,6 @@ const useLocalChatThreadRuntime = ({
     [...chat.messages]
       .reverse()
       .find((message) => message.role === "user")?.id ?? null;
-  const latestUserText =
-    [...chat.messages]
-      .reverse()
-      .find((message) => message.role === "user")
-      ?.parts.filter((part) => part.type === "text")
-      .map((part) => part.text)
-      .join(" ")
-      .trim() ?? "";
-
   useEffect(() => {
     if (!remoteId) {
       return;
@@ -233,40 +229,6 @@ const useLocalChatThreadRuntime = ({
   useEffect(() => {
     currentJobIdRef.current = null;
   }, [runtimeThreadKey]);
-
-  const lastAutoTitledMessageKeyRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!remoteId || !latestUserMessageId || !latestUserText) {
-      return;
-    }
-
-    if (currentTitle && currentTitle !== DEFAULT_THREAD_TITLE) {
-      return;
-    }
-
-    const updateKey = `${remoteId}:${latestUserMessageId}`;
-    if (lastAutoTitledMessageKeyRef.current === updateKey) {
-      return;
-    }
-
-    lastAutoTitledMessageKeyRef.current = updateKey;
-    void assistantRuntime.threads.mainItem
-      .rename(createAutoThreadTitle(latestUserText))
-      .catch((error) => {
-        lastAutoTitledMessageKeyRef.current = null;
-        console.warn("Failed to auto-title thread", {
-          threadId: remoteId,
-          error,
-        });
-      });
-  }, [
-    assistantRuntime,
-    currentTitle,
-    latestUserMessageId,
-    latestUserText,
-    remoteId,
-  ]);
 
   useEffect(() => {
     if (lastRuntimeThreadKeyRef.current !== runtimeThreadKey) {
@@ -301,21 +263,8 @@ const useLocalChatThreadRuntime = ({
     if (!userMessageChanged && lastUpdatedUserMessageKeyRef.current) {
       return;
     }
-
-    const updatedAt = new Date().toISOString();
-    void updateRemoteThread({
-      apiBaseUrl,
-      userId,
-      threadId: remoteId,
-      updatedAt,
-    }).catch((error) => {
-      console.warn("Failed to update thread timestamp", {
-        threadId: remoteId,
-        error,
-      });
-    });
     lastUpdatedUserMessageKeyRef.current = updateKey;
-  }, [apiBaseUrl, latestUserMessageId, remoteId, runtimeThreadKey, userId]);
+  }, [latestUserMessageId, remoteId, runtimeThreadKey]);
 
   const runtime = useAISDKRuntime({
     ...chat,
@@ -337,7 +286,7 @@ const ThreadStoreSync = () => {
       return;
     }
 
-    localThreadStore.setActiveThread(remoteId);
+    setStoredActiveThreadId(remoteId);
   }, [remoteId]);
 
   return null;
@@ -345,8 +294,10 @@ const ThreadStoreSync = () => {
 
 const InitialThreadSwitch = ({
   storedThreadId,
+  onResolved,
 }: {
   storedThreadId?: string;
+  onResolved: () => void;
 }) => {
   const aui = useAui();
   const isLoading = useAuiState((s) => s.threads.isLoading);
@@ -355,24 +306,44 @@ const InitialThreadSwitch = ({
   const hasSwitchedRef = useRef(false);
 
   useEffect(() => {
-    if (hasSwitchedRef.current || isLoading || !storedThreadId) {
+    if (isLoading) {
+      return;
+    }
+
+    if (!storedThreadId) {
+      onResolved();
       return;
     }
 
     if (mainThreadId === storedThreadId) {
       hasSwitchedRef.current = true;
+      onResolved();
+      return;
+    }
+
+    if (hasSwitchedRef.current) {
+      onResolved();
       return;
     }
 
     if (!threadIds.includes(storedThreadId)) {
       hasSwitchedRef.current = true;
-      localThreadStore.clearActiveThread();
+      clearStoredActiveThreadId();
+      onResolved();
       return;
     }
 
     hasSwitchedRef.current = true;
-    void aui.threads().switchToThread(storedThreadId);
-  }, [aui, isLoading, mainThreadId, storedThreadId, threadIds]);
+    void (async () => {
+      try {
+        await aui.threads().switchToThread(storedThreadId);
+      } catch {
+        clearStoredActiveThreadId();
+      } finally {
+        onResolved();
+      }
+    })();
+  }, [aui, isLoading, mainThreadId, onResolved, storedThreadId, threadIds]);
 
   return null;
 };
@@ -384,6 +355,18 @@ const ChatShellRuntime = ({
   apiBaseUrl: string;
   storedThreadId?: string;
 }) => {
+  const [isInitialThreadResolved, setIsInitialThreadResolved] = useState(
+    !storedThreadId,
+  );
+
+  useEffect(() => {
+    setIsInitialThreadResolved(!storedThreadId);
+  }, [storedThreadId]);
+
+  const handleInitialThreadResolved = useCallback(() => {
+    setIsInitialThreadResolved(true);
+  }, []);
+
   const adapter = useMemo(
     () =>
       new RemoteApiThreadListAdapter({
@@ -406,33 +389,26 @@ const ChatShellRuntime = ({
 
   return (
     <AssistantRuntimeProvider runtime={runtime}>
-      <InitialThreadSwitch storedThreadId={storedThreadId} />
+      <InitialThreadSwitch
+        storedThreadId={storedThreadId}
+        onResolved={handleInitialThreadResolved}
+      />
       <ThreadStoreSync />
-      <ChatShellLayout storedThreadId={storedThreadId} />
+      <ChatShellLayout isInitialThreadResolved={isInitialThreadResolved} />
     </AssistantRuntimeProvider>
   );
 };
 
 const ChatShellLayout = ({
-  storedThreadId,
+  isInitialThreadResolved,
 }: {
-  storedThreadId?: string;
+  isInitialThreadResolved: boolean;
 }) => {
-  const isLoading = useAuiState((s) => s.threads.isLoading);
-  const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
-  const threadIds = useAuiState((s) => s.threads.threadIds);
-
-  const isRestoringStoredThread =
-    !!storedThreadId &&
-    !isLoading &&
-    threadIds.includes(storedThreadId) &&
-    mainThreadId !== storedThreadId;
-
   return (
     <div className="flex h-dvh bg-[#212121] text-[#ececec]">
       <ThreadListSidebar />
       <main className="min-w-0 flex-1">
-        {isRestoringStoredThread ? (
+        {!isInitialThreadResolved ? (
           <div className="flex h-dvh items-center justify-center text-sm text-[#9f9f9f]">
             Loading thread...
           </div>

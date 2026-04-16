@@ -1,6 +1,7 @@
 export type MaybePromise<T> = T | Promise<T>;
 
 export type ThreadId = string;
+export const DEFAULT_THREAD_TITLE = "New chat";
 
 export type ThreadTitleSource = "manual" | "first-user-message" | "generated";
 
