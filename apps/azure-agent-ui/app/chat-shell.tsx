@@ -323,7 +323,7 @@ const useLocalChatThreadRuntime = ({
   });
 
   if (transport instanceof AssistantChatTransport) {
-    transport.setRuntime(runtime);
+    transport.setRuntime(assistantRuntime);
   }
 
   return runtime;
