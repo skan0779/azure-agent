@@ -19,7 +19,6 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
@@ -62,15 +61,12 @@ const EmptyThreadView: FC = () => {
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mx-auto flex h-full w-full max-w-5xl flex-1 items-center justify-center px-4 pb-8 pt-12">
         <div className="w-full max-w-4xl">
-          <div className="mb-10 flex flex-col items-center text-center">
-            <div className="mb-5 flex size-14 items-center justify-center rounded-full bg-white/5 text-white shadow-sm ring-1 ring-white/10">
-              <SparklesIcon className="size-6" />
-            </div>
+          <div className="mb-10 flex flex-col items-start text-left">
             <p className="text-3xl font-medium tracking-tight text-white">
-              Hello there
+              Hello there!
             </p>
             <p className="mt-3 text-3xl tracking-tight text-[#9f9f9f]">
-              Where would you like to start?
+              How can I help you today?
             </p>
           </div>
 
@@ -206,22 +202,13 @@ const EmptyComposer: FC = () => {
       />
 
       <div className="mt-2 flex items-center justify-between gap-3 px-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center">
           <ComposerPrimitive.AddAttachment className="flex size-9 items-center justify-center rounded-full text-[#cfcfcf] transition hover:bg-white/10 hover:text-white">
             <PlusIcon className="size-4" />
           </ComposerPrimitive.AddAttachment>
-          <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cfcfcf]">
-            <SparklesIcon className="size-4" />
-            <span>Tools</span>
-          </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="hidden items-center gap-1 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-[#cfcfcf] sm:flex">
-            <span>Agent</span>
-            <ChevronDownIcon className="size-4" />
-          </div>
-
           <AuiIf condition={(s) => !s.thread.isRunning}>
             <ComposerPrimitive.Send className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-opacity disabled:opacity-30">
               <ArrowUpIcon className="size-4" />
