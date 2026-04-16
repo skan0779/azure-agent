@@ -26,6 +26,8 @@ import {
   PlusIcon,
   RotateCcwIcon,
   SquareIcon,
+  ThumbsDownIcon,
+  ThumbsUpIcon,
   XIcon,
 } from "lucide-react";
 
@@ -50,11 +52,7 @@ export const Thread: FC = () => {
         </AuiIf>
 
         <ThreadPrimitive.Messages>
-          {({ message }) => {
-            if (message.composer.isEditing) return <EditComposer />;
-            if (message.role === "user") return <UserMessage />;
-            return <AssistantMessage />;
-          }}
+          {() => <ThreadMessage />}
         </ThreadPrimitive.Messages>
 
         <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 dark:bg-[#212121]">
@@ -67,6 +65,21 @@ export const Thread: FC = () => {
       </ThreadPrimitive.Viewport>
     </ThreadPrimitive.Root>
   );
+};
+
+const ThreadMessage: FC = () => {
+  const isEditing = useAuiState((s) => s.message.composer.isEditing);
+  const role = useAuiState((s) => s.message.role);
+
+  if (isEditing) {
+    return <EditComposer />;
+  }
+
+  if (role === "user") {
+    return <UserMessage />;
+  }
+
+  return <AssistantMessage />;
 };
 
 const Composer: FC = () => {
@@ -198,6 +211,16 @@ const AssistantMessage: FC = () => {
             autohideFloat="single-branch"
             className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:border-2 data-floating:p-1"
           >
+            <ActionBarPrimitive.FeedbackPositive asChild>
+              <TooltipIconButton tooltip="Good response" className="text-[#b4b4b4]">
+                <ThumbsUpIcon />
+              </TooltipIconButton>
+            </ActionBarPrimitive.FeedbackPositive>
+            <ActionBarPrimitive.FeedbackNegative asChild>
+              <TooltipIconButton tooltip="Bad response" className="text-[#b4b4b4]">
+                <ThumbsDownIcon />
+              </TooltipIconButton>
+            </ActionBarPrimitive.FeedbackNegative>
             <ActionBarPrimitive.Reload asChild>
               <TooltipIconButton tooltip="Reload" className="text-[#b4b4b4]">
                 <RotateCcwIcon />
