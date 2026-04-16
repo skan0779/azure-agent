@@ -1,11 +1,9 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import {
   ActionBarPrimitive,
   AuiIf,
   AttachmentPrimitive,
-  BranchPickerPrimitive,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
@@ -20,12 +18,9 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CopyIcon,
   PencilIcon,
   PlusIcon,
-  RefreshCwIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
@@ -143,8 +138,6 @@ const UserMessage: FC = () => {
           <MessagePrimitive.Parts />
         </div>
       </div>
-
-      <BranchPicker className="mt-2 mr-3" />
     </MessagePrimitive.Root>
   );
 };
@@ -183,19 +176,12 @@ const AssistantMessage: FC = () => {
         </div>
 
         <div className="flex pt-2">
-          <BranchPicker />
-
           <ActionBarPrimitive.Root
             hideWhenRunning
             autohide="not-last"
             autohideFloat="single-branch"
             className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:border-2 data-floating:p-1"
           >
-            <ActionBarPrimitive.Reload asChild>
-              <TooltipIconButton tooltip="Reload" className="text-[#b4b4b4]">
-                <RefreshCwIcon />
-              </TooltipIconButton>
-            </ActionBarPrimitive.Reload>
             <ActionBarPrimitive.Copy asChild>
               <TooltipIconButton tooltip="Copy" className="text-[#b4b4b4]">
                 <AuiIf condition={(s) => s.message.isCopied}>
@@ -220,30 +206,6 @@ const MessageError: FC = () => {
         <ErrorPrimitive.Message className="line-clamp-2" />
       </ErrorPrimitive.Root>
     </MessagePrimitive.Error>
-  );
-};
-
-const BranchPicker: FC<{ className?: string }> = ({ className }) => {
-  return (
-    <BranchPickerPrimitive.Root
-      hideWhenSingleBranch
-      className={cn(
-        "inline-flex items-center font-semibold text-muted-foreground text-sm dark:text-[#b4b4b4]",
-        className,
-      )}
-    >
-      <BranchPickerPrimitive.Previous asChild>
-        <TooltipIconButton tooltip="Previous" className="text-[#b4b4b4]">
-          <ChevronLeftIcon />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Previous>
-      <BranchPickerPrimitive.Number />/<BranchPickerPrimitive.Count />
-      <BranchPickerPrimitive.Next asChild>
-        <TooltipIconButton tooltip="Next" className="text-[#b4b4b4]">
-          <ChevronRightIcon />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Next>
-    </BranchPickerPrimitive.Root>
   );
 };
 

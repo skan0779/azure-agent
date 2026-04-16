@@ -19,7 +19,6 @@ import {
   getThreadMessages,
   updateThread as updateRemoteThread,
 } from "@/lib/thread-api";
-import { localThreadMessageStore } from "@/lib/thread-message-store.local";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 import {
   DEFAULT_THREAD_TITLE,
@@ -150,12 +149,7 @@ const useLocalChatThreadRuntime = ({
 }) => {
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
-  const storageThreadId = remoteId ?? threadId;
   const runtimeThreadKey = remoteId ?? threadId;
-  const initialMessages = useMemo(
-    () => localThreadMessageStore.getMessages(storageThreadId),
-    [storageThreadId],
-  );
   const currentJobIdRef = useRef<string | null>(null);
 
   const transport = useMemo(
@@ -172,7 +166,7 @@ const useLocalChatThreadRuntime = ({
 
   const chat = useChat({
     id: threadId,
-    messages: initialMessages,
+    messages: [],
     transport,
     onData: (dataPart) => {
       if (dataPart.type !== "data-metadata") {
@@ -186,14 +180,6 @@ const useLocalChatThreadRuntime = ({
     },
     onFinish: () => {
       currentJobIdRef.current = null;
-
-      if (!remoteId) {
-        return;
-      }
-
-      void syncMessagesFromServer(remoteId, {
-        context: "refresh thread messages after finish",
-      });
     },
     onError: () => {
       currentJobIdRef.current = null;
@@ -237,7 +223,6 @@ const useLocalChatThreadRuntime = ({
           threadId: targetThreadId,
         });
 
-        localThreadMessageStore.setMessages(targetThreadId, messages);
         setMessagesRef.current(messages);
       } catch (error) {
         console.warn(`Failed to ${context}`, {
@@ -253,10 +238,6 @@ const useLocalChatThreadRuntime = ({
     [...chat.messages]
       .reverse()
       .find((message) => message.role === "user")?.id ?? null;
-
-  useEffect(() => {
-    localThreadMessageStore.setMessages(storageThreadId, chat.messages);
-  }, [chat.messages, storageThreadId]);
 
   useEffect(() => {
     if (!remoteId) {
