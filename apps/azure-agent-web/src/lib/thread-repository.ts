@@ -185,10 +185,14 @@ export class ThreadRepository {
           last_job_id = COALESCE(EXCLUDED.last_job_id, agent_threads.last_job_id),
           title = CASE
             WHEN agent_threads.title_source = 'manual' THEN agent_threads.title
+            WHEN EXCLUDED.title_source = 'manual' THEN EXCLUDED.title
+            WHEN agent_threads.title_source = 'first-user-message' THEN agent_threads.title
             ELSE EXCLUDED.title
           END,
           title_source = CASE
             WHEN agent_threads.title_source = 'manual' THEN agent_threads.title_source
+            WHEN EXCLUDED.title_source = 'manual' THEN EXCLUDED.title_source
+            WHEN agent_threads.title_source = 'first-user-message' THEN agent_threads.title_source
             ELSE EXCLUDED.title_source
           END
         WHERE agent_threads.user_id = EXCLUDED.user_id
