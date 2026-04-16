@@ -55,15 +55,16 @@ export const Thread: FC = () => {
 const EmptyThreadView: FC = () => {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mx-auto flex h-full w-full max-w-3xl flex-1 flex-col px-2 pb-6 pt-16">
-        <div className="flex flex-1 flex-col items-center justify-center">
+      <div className="mx-auto flex h-full w-full max-w-3xl flex-1 items-center justify-center px-2 pb-6 pt-16">
+        <div className="w-full max-w-3xl">
+          <div className="flex flex-col items-center">
           <Avatar className="flex h-12 w-12 items-center justify-center rounded-3xl border shadow dark:border-white/15">
             <AvatarFallback>C</AvatarFallback>
           </Avatar>
-          <p className="mt-4 text-xl dark:text-white">How can I help you today?</p>
-        </div>
-
-        <div className="mx-auto w-full max-w-3xl">
+            <p className="mt-4 text-xl dark:text-white">
+              How can I help you today?
+            </p>
+          </div>
           <Composer />
           <p className="mt-4 text-center text-muted-foreground text-xs dark:text-[#cdcdcd]">
             Agent can make mistakes. Check important info.
