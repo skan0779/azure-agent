@@ -239,7 +239,7 @@ const AssistantMessage: FC = () => {
             hideWhenRunning
             autohide="not-last"
             autohideFloat="single-branch"
-            className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:border-2 data-floating:p-1"
+            className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:p-1"
           >
             <ActionBarPrimitive.FeedbackPositive asChild>
               <TooltipIconButton tooltip="Good response" className="text-[#b4b4b4]">
