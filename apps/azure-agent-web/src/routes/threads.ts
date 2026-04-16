@@ -147,7 +147,10 @@ export const buildThreadsRoutes = ({
         title: parsedBody.data.title?.trim() || existing.title,
         updatedAt: parsedBody.data.updatedAt ?? new Date().toISOString(),
         lastJobId: parsedBody.data.lastJobId ?? existing.lastJobId,
-        titleSource: parsedBody.data.titleSource ?? existing.titleSource,
+        titleSource:
+          parsedBody.data.title?.trim() === existing.title
+            ? existing.titleSource
+            : (parsedBody.data.titleSource ?? existing.titleSource),
       });
     });
 

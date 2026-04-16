@@ -18,9 +18,11 @@ import { Assistant } from "@/app/assistant";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
 import { getThreadMessages } from "@/lib/thread-api";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
+import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 
 const DEFAULT_USER_ID = "1015520";
+const AUTO_TITLE_TOKEN_LIMIT = 7;
 
 const getStoredActiveThreadId = () => {
   if (typeof window === "undefined") {
@@ -57,6 +59,20 @@ const clearStoredActiveThreadId = () => {
   }
 
   window.localStorage.removeItem(ACTIVE_THREAD_ID_STORAGE_KEY);
+};
+
+const createAutoThreadTitle = (text: string): string => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return DEFAULT_THREAD_TITLE;
+  }
+
+  const tokens = normalized.split(" ");
+  if (tokens.length <= AUTO_TITLE_TOKEN_LIMIT) {
+    return normalized;
+  }
+
+  return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
 };
 
 const cancelChatJob = async ({
@@ -104,6 +120,7 @@ const useLocalChatThreadRuntime = ({
   const assistantRuntime = useAssistantRuntime();
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const currentTitle = useAuiState((s) => s.threadListItem.title);
   const runtimeThreadKey = remoteId ?? threadId;
   const chatStoreThreadIdRef = useRef<string | null>(null);
   const chatStoreKeyRef = useRef<string>("");
@@ -202,6 +219,16 @@ const useLocalChatThreadRuntime = ({
     [...chat.messages]
       .reverse()
       .find((message) => message.role === "user")?.id ?? null;
+  const latestUserText =
+    [...chat.messages]
+      .reverse()
+      .find((message) => message.role === "user")
+      ?.parts.filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join(" ")
+      .trim() ?? "";
+
+  const lastGeneratedTitleKeyRef = useRef<string | null>(null);
   useEffect(() => {
     if (!remoteId) {
       return;
@@ -231,6 +258,38 @@ const useLocalChatThreadRuntime = ({
   }, [runtimeThreadKey]);
 
   useEffect(() => {
+    if (!remoteId || !latestUserMessageId || !latestUserText) {
+      return;
+    }
+
+    if (currentTitle && currentTitle !== DEFAULT_THREAD_TITLE) {
+      return;
+    }
+
+    const generationKey = `${remoteId}:${latestUserMessageId}`;
+    if (lastGeneratedTitleKeyRef.current === generationKey) {
+      return;
+    }
+
+    lastGeneratedTitleKeyRef.current = generationKey;
+    void assistantRuntime.threads.mainItem
+      .rename(createAutoThreadTitle(latestUserText))
+      .catch((error) => {
+      lastGeneratedTitleKeyRef.current = null;
+      console.warn("Failed to sync optimistic thread title", {
+        threadId: remoteId,
+        error,
+      });
+    });
+  }, [
+    assistantRuntime,
+    currentTitle,
+    latestUserMessageId,
+    latestUserText,
+    remoteId,
+  ]);
+
+  useEffect(() => {
     if (lastRuntimeThreadKeyRef.current !== runtimeThreadKey) {
       lastRuntimeThreadKeyRef.current = runtimeThreadKey;
       lastObservedUserMessageIdRef.current = latestUserMessageId;
@@ -238,6 +297,7 @@ const useLocalChatThreadRuntime = ({
         remoteId && latestUserMessageId
           ? `${remoteId}:${latestUserMessageId}`
           : null;
+      lastGeneratedTitleKeyRef.current = null;
       return;
     }
 
