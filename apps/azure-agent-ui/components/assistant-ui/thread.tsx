@@ -4,6 +4,7 @@ import {
   ActionBarPrimitive,
   AuiIf,
   AttachmentPrimitive,
+  BranchPickerPrimitive,
   ComposerPrimitive,
   ErrorPrimitive,
   MessagePrimitive,
@@ -18,9 +19,12 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   CopyIcon,
   PencilIcon,
   PlusIcon,
+  RotateCcwIcon,
   SquareIcon,
   XIcon,
 } from "lucide-react";
@@ -125,8 +129,18 @@ const UserMessage: FC = () => {
           hideWhenRunning
           autohide="not-last"
           autohideFloat="single-branch"
-          className="mt-2"
+          className="mt-2 flex items-center gap-1"
         >
+          <ActionBarPrimitive.Copy asChild>
+            <TooltipIconButton tooltip="Copy" className="text-[#b4b4b4]">
+              <AuiIf condition={(s) => s.message.isCopied}>
+                <CheckIcon />
+              </AuiIf>
+              <AuiIf condition={(s) => !s.message.isCopied}>
+                <CopyIcon />
+              </AuiIf>
+            </TooltipIconButton>
+          </ActionBarPrimitive.Copy>
           <ActionBarPrimitive.Edit asChild>
             <TooltipIconButton tooltip="Edit" className="text-[#b4b4b4]">
               <PencilIcon />
@@ -138,6 +152,8 @@ const UserMessage: FC = () => {
           <MessagePrimitive.Parts />
         </div>
       </div>
+
+      <MessageBranchPicker align="end" />
     </MessagePrimitive.Root>
   );
 };
@@ -182,6 +198,11 @@ const AssistantMessage: FC = () => {
             autohideFloat="single-branch"
             className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:border-2 data-floating:p-1"
           >
+            <ActionBarPrimitive.Reload asChild>
+              <TooltipIconButton tooltip="Reload" className="text-[#b4b4b4]">
+                <RotateCcwIcon />
+              </TooltipIconButton>
+            </ActionBarPrimitive.Reload>
             <ActionBarPrimitive.Copy asChild>
               <TooltipIconButton tooltip="Copy" className="text-[#b4b4b4]">
                 <AuiIf condition={(s) => s.message.isCopied}>
@@ -194,8 +215,37 @@ const AssistantMessage: FC = () => {
             </ActionBarPrimitive.Copy>
           </ActionBarPrimitive.Root>
         </div>
+
+        <MessageBranchPicker align="start" />
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+const MessageBranchPicker = ({
+  align,
+}: {
+  align: "start" | "end";
+}) => {
+  return (
+    <BranchPickerPrimitive.Root
+      hideWhenSingleBranch
+      className={`flex items-center gap-1 pt-1 ${align === "end" ? "self-end" : "self-start"}`}
+    >
+      <BranchPickerPrimitive.Previous asChild>
+        <TooltipIconButton tooltip="Previous branch" className="text-[#8f8f8f]">
+          <ChevronLeftIcon />
+        </TooltipIconButton>
+      </BranchPickerPrimitive.Previous>
+      <div className="min-w-10 text-center text-[#8f8f8f] text-xs tabular-nums">
+        <BranchPickerPrimitive.Number />/<BranchPickerPrimitive.Count />
+      </div>
+      <BranchPickerPrimitive.Next asChild>
+        <TooltipIconButton tooltip="Next branch" className="text-[#8f8f8f]">
+          <ChevronRightIcon />
+        </TooltipIconButton>
+      </BranchPickerPrimitive.Next>
+    </BranchPickerPrimitive.Root>
   );
 };
 
