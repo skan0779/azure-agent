@@ -53,9 +53,9 @@ const sourceDocumentPartSchema = z.object({
 
 const filePartSchema = z.object({
   type: z.literal("file"),
-  mediaType: z.string().min(1),
+  mimeType: z.string().min(1),
   filename: z.string().optional(),
-  url: z.string().min(1),
+  data: z.string().min(1),
 });
 
 const stepStartPartSchema = z.object({

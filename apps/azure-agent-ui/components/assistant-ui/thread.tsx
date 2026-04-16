@@ -22,6 +22,9 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
+  ExternalLinkIcon,
+  FileTextIcon,
+  LoaderIcon,
   PencilIcon,
   PlusIcon,
   RotateCcwIcon,
@@ -196,11 +199,18 @@ const AssistantMessage: FC = () => {
           <MessagePrimitive.Parts>
             {({ part }) => {
               if (part.type === "text") return <MarkdownText />;
+              if (part.type === "file") return <AssistantFilePart part={part} />;
               if (part.type === "tool-call")
                 return part.toolUI ?? <ToolFallback {...part} />;
               return null;
             }}
           </MessagePrimitive.Parts>
+          <AuiIf condition={(s) => s.thread.isRunning && s.message.content.length === 0}>
+            <div className="mt-2 flex items-center gap-2 text-[#9f9f9f]">
+              <LoaderIcon className="size-4 animate-spin" />
+              <span className="text-sm">Thinking...</span>
+            </div>
+          </AuiIf>
           <MessageError />
         </div>
 
@@ -242,6 +252,40 @@ const AssistantMessage: FC = () => {
         <MessageBranchPicker align="start" />
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+const AssistantFilePart = ({
+  part,
+}: {
+  part: {
+    filename?: string;
+    mimeType: string;
+    data: string;
+  };
+}) => {
+  const fileLabel = part.filename?.trim() || "Attached file";
+
+  return (
+    <a
+      href={part.data}
+      target="_blank"
+      rel="noreferrer"
+      className="mt-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+    >
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#d8d8d8]">
+        <FileTextIcon className="size-5" />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-sm text-[#f1f1f1]">
+          {fileLabel}
+        </div>
+        <div className="truncate text-xs text-[#9f9f9f]">{part.mimeType}</div>
+      </div>
+
+      <ExternalLinkIcon className="size-4 shrink-0 text-[#8f8f8f]" />
+    </a>
   );
 };
 
