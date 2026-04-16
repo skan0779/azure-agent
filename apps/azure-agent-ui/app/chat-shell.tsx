@@ -20,11 +20,13 @@ import {
   getThreadMessages,
   updateThread as updateRemoteThread,
 } from "@/lib/thread-api";
+import { DEFAULT_THREAD_TITLE } from "@/lib/thread-store.local";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 import { localThreadStore } from "@/lib/thread-store.local";
 
 const DEFAULT_USER_ID = "1015520";
+const AUTO_TITLE_TOKEN_LIMIT = 7;
 
 const getStoredActiveThreadId = () => {
   if (typeof window === "undefined") {
@@ -45,6 +47,20 @@ const extractJobId = (value: unknown): string | null => {
   }
 
   return value.jobId;
+};
+
+const createAutoThreadTitle = (text: string): string => {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return DEFAULT_THREAD_TITLE;
+  }
+
+  const tokens = normalized.split(" ");
+  if (tokens.length <= AUTO_TITLE_TOKEN_LIMIT) {
+    return normalized;
+  }
+
+  return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
 };
 
 const cancelChatJob = async ({
@@ -92,6 +108,7 @@ const useLocalChatThreadRuntime = ({
   const assistantRuntime = useAssistantRuntime();
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const currentTitle = useAuiState((s) => s.threadListItem.title);
   const runtimeThreadKey = remoteId ?? threadId;
   const currentJobIdRef = useRef<string | null>(null);
 
@@ -181,19 +198,14 @@ const useLocalChatThreadRuntime = ({
     [...chat.messages]
       .reverse()
       .find((message) => message.role === "user")?.id ?? null;
-
-  useEffect(() => {
-    if (remoteId) {
-      return;
-    }
-
-    void assistantRuntime.threads.mainItem.initialize().catch((error) => {
-      console.warn("Failed to initialize remote thread", {
-        threadId,
-        error,
-      });
-    });
-  }, [assistantRuntime, remoteId, threadId]);
+  const latestUserText =
+    [...chat.messages]
+      .reverse()
+      .find((message) => message.role === "user")
+      ?.parts.filter((part) => part.type === "text")
+      .map((part) => part.text)
+      .join(" ")
+      .trim() ?? "";
 
   useEffect(() => {
     if (!remoteId) {
@@ -222,6 +234,40 @@ const useLocalChatThreadRuntime = ({
   useEffect(() => {
     currentJobIdRef.current = null;
   }, [runtimeThreadKey]);
+
+  const lastAutoTitledMessageKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!remoteId || !latestUserMessageId || !latestUserText) {
+      return;
+    }
+
+    if (currentTitle && currentTitle !== DEFAULT_THREAD_TITLE) {
+      return;
+    }
+
+    const updateKey = `${remoteId}:${latestUserMessageId}`;
+    if (lastAutoTitledMessageKeyRef.current === updateKey) {
+      return;
+    }
+
+    lastAutoTitledMessageKeyRef.current = updateKey;
+    void assistantRuntime.threads.mainItem
+      .rename(createAutoThreadTitle(latestUserText))
+      .catch((error) => {
+        lastAutoTitledMessageKeyRef.current = null;
+        console.warn("Failed to auto-title thread", {
+          threadId: remoteId,
+          error,
+        });
+      });
+  }, [
+    assistantRuntime,
+    currentTitle,
+    latestUserMessageId,
+    latestUserText,
+    remoteId,
+  ]);
 
   useEffect(() => {
     if (lastRuntimeThreadKeyRef.current !== runtimeThreadKey) {
