@@ -191,21 +191,9 @@ const useLocalChatThreadRuntime = ({
         return;
       }
 
-      void getThreadMessages({
-        apiBaseUrl,
-        userId,
-        threadId: remoteId,
-      })
-        .then((messages) => {
-          localThreadMessageStore.setMessages(remoteId, messages);
-          chat.setMessages(messages);
-        })
-        .catch((error) => {
-          console.warn("Failed to refresh thread messages after finish", {
-            threadId: remoteId,
-            error,
-          });
-        });
+      void syncMessagesFromServer(remoteId, {
+        context: "refresh thread messages after finish",
+      });
     },
     onError: () => {
       currentJobIdRef.current = null;
@@ -231,6 +219,35 @@ const useLocalChatThreadRuntime = ({
   const lastObservedUserMessageIdRef = useRef<string | null>(null);
   const lastUpdatedUserMessageKeyRef = useRef<string | null>(null);
   const lastRuntimeThreadKeyRef = useRef<string | null>(null);
+  const setMessagesRef = useRef(chat.setMessages);
+
+  useEffect(() => {
+    setMessagesRef.current = chat.setMessages;
+  }, [chat.setMessages]);
+
+  const syncMessagesFromServer = useCallback(
+    async (
+      targetThreadId: string,
+      { context }: { context: string },
+    ) => {
+      try {
+        const messages = await getThreadMessages({
+          apiBaseUrl,
+          userId,
+          threadId: targetThreadId,
+        });
+
+        localThreadMessageStore.setMessages(targetThreadId, messages);
+        setMessagesRef.current(messages);
+      } catch (error) {
+        console.warn(`Failed to ${context}`, {
+          threadId: targetThreadId,
+          error,
+        });
+      }
+    },
+    [apiBaseUrl, userId],
+  );
 
   const latestUserMessageId =
     [...chat.messages]
@@ -248,30 +265,18 @@ const useLocalChatThreadRuntime = ({
 
     let cancelled = false;
 
-    void getThreadMessages({
-      apiBaseUrl,
-      userId,
-      threadId: remoteId,
-    })
-      .then((messages) => {
+    void syncMessagesFromServer(remoteId, {
+      context: "load thread messages",
+    }).then(() => {
         if (cancelled) {
           return;
         }
-
-        localThreadMessageStore.setMessages(remoteId, messages);
-        chat.setMessages(messages);
-      })
-      .catch((error) => {
-        console.warn("Failed to load thread messages", {
-          threadId: remoteId,
-          error,
-        });
       });
 
     return () => {
       cancelled = true;
     };
-  }, [apiBaseUrl, chat, remoteId, userId]);
+  }, [remoteId, syncMessagesFromServer]);
 
   useEffect(() => {
     currentJobIdRef.current = null;
