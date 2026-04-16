@@ -157,11 +157,13 @@ const UserMessage: FC = () => {
               </AuiIf>
             </TooltipIconButton>
           </ActionBarPrimitive.Copy>
-          <ActionBarPrimitive.Edit asChild>
-            <TooltipIconButton tooltip="Edit" className="text-[#b4b4b4]">
-              <PencilIcon />
-            </TooltipIconButton>
-          </ActionBarPrimitive.Edit>
+          <AuiIf condition={(s) => s.message.isLast}>
+            <ActionBarPrimitive.Edit asChild>
+              <TooltipIconButton tooltip="Edit" className="text-[#b4b4b4]">
+                <PencilIcon />
+              </TooltipIconButton>
+            </ActionBarPrimitive.Edit>
+          </AuiIf>
         </ActionBarPrimitive.Root>
 
         <div className="rounded-3xl bg-secondary px-5 py-2 text-foreground dark:bg-white/5 dark:text-[#eee]">
@@ -251,11 +253,13 @@ const AssistantMessage: FC = () => {
                 <ThumbsDownIcon />
               </TooltipIconButton>
             </ActionBarPrimitive.FeedbackNegative>
-            <ActionBarPrimitive.Reload asChild>
-              <TooltipIconButton tooltip="Reload" className="text-[#b4b4b4]">
-                <RotateCcwIcon />
-              </TooltipIconButton>
-            </ActionBarPrimitive.Reload>
+            <AuiIf condition={(s) => s.message.isLast}>
+              <ActionBarPrimitive.Reload asChild>
+                <TooltipIconButton tooltip="Reload" className="text-[#b4b4b4]">
+                  <RotateCcwIcon />
+                </TooltipIconButton>
+              </ActionBarPrimitive.Reload>
+            </AuiIf>
             <ActionBarPrimitive.Copy asChild>
               <TooltipIconButton tooltip="Copy" className="text-[#b4b4b4]">
                 <AuiIf condition={(s) => s.message.isCopied}>
