@@ -100,13 +100,7 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
     const thread = threads.find((item) => item.id === threadId);
 
     if (!thread) {
-      const created = await createThread({
-        ...this.options,
-        id: threadId,
-        title: DEFAULT_THREAD_TITLE,
-        titleSource: "generated",
-      });
-      return toMetadata(created);
+      throw new Error(`Thread not found: ${threadId}`);
     }
 
     return toMetadata(thread);

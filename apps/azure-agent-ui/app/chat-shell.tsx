@@ -352,6 +352,7 @@ const InitialThreadSwitch = ({
   const aui = useAui();
   const isLoading = useAuiState((s) => s.threads.isLoading);
   const mainThreadId = useAuiState((s) => s.threads.mainThreadId);
+  const threadIds = useAuiState((s) => s.threads.threadIds);
   const hasSwitchedRef = useRef(false);
 
   useEffect(() => {
@@ -364,9 +365,15 @@ const InitialThreadSwitch = ({
       return;
     }
 
+    if (!threadIds.includes(storedThreadId)) {
+      hasSwitchedRef.current = true;
+      localThreadStore.clearActiveThread();
+      return;
+    }
+
     hasSwitchedRef.current = true;
     void aui.threads().switchToThread(storedThreadId);
-  }, [aui, isLoading, mainThreadId, storedThreadId]);
+  }, [aui, isLoading, mainThreadId, storedThreadId, threadIds]);
 
   return null;
 };
