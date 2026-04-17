@@ -48,6 +48,18 @@ const extractJobId = (value: unknown): string | null => {
   return value.jobId;
 };
 
+const isCitationPart = (part: unknown): boolean => {
+  if (!part || typeof part !== "object" || !("type" in part)) {
+    return false;
+  }
+
+  if (part.type === "data-citation") {
+    return true;
+  }
+
+  return "name" in part && part.type === "data" && part.name === "citation";
+};
+
 const setStoredActiveThreadId = (threadId: string) => {
   if (typeof window === "undefined") {
     return;
@@ -245,18 +257,10 @@ const useLocalChatThreadRuntime = ({
                 ...message,
                 parts: [
                   ...message.parts.filter(
-                    (part) =>
-                      !part ||
-                      typeof part !== "object" ||
-                      !("type" in part) ||
-                      part.type !== "data-citation",
+                    (part) => !isCitationPart(part),
                   ),
                   ...serverAssistant.parts.filter(
-                    (part) =>
-                      part &&
-                      typeof part === "object" &&
-                      "type" in part &&
-                      part.type === "data-citation",
+                    (part) => isCitationPart(part),
                   ),
                 ],
               }

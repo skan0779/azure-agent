@@ -54,6 +54,10 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
 
   const candidate = part as Record<string, unknown>;
 
+  if (candidate.type === "data" && candidate.name === "citation") {
+    return toSerializableCitation(candidate.data);
+  }
+
   if (candidate.type === "data-citation") {
     return toSerializableCitation(candidate.data);
   }
