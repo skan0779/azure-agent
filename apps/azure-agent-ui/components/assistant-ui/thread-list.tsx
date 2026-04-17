@@ -78,6 +78,7 @@ const ThreadListItem: FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const pendingRenameFocusRef = useRef(false);
 
   const canRename = status !== "new";
 
@@ -111,6 +112,7 @@ const ThreadListItem: FC = () => {
       input.focus();
       const end = input.value.length;
       input.setSelectionRange(end, end);
+      pendingRenameFocusRef.current = false;
     });
 
     return () => {
@@ -182,19 +184,19 @@ const ThreadListItem: FC = () => {
             align="end"
             side="bottom"
             onCloseAutoFocus={(event) => {
-              if (isEditing) {
+              if (pendingRenameFocusRef.current || isEditing) {
                 event.preventDefault();
               }
             }}
           >
             <DropdownMenuItem
               disabled={!canRename}
-              onSelect={(event) => {
-                event.preventDefault();
+              onSelect={() => {
                 if (!canRename) {
                   return;
                 }
 
+                pendingRenameFocusRef.current = true;
                 setDraftTitle(title);
                 setIsEditing(true);
               }}
@@ -205,8 +207,7 @@ const ThreadListItem: FC = () => {
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-[#ffb4b4] focus:bg-red-500/15 focus:text-[#ffd0d0]"
-              onSelect={(event) => {
-                event.preventDefault();
+              onSelect={() => {
                 void aui.threadListItem().delete();
               }}
             >
