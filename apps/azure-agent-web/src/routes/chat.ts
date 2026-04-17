@@ -12,6 +12,7 @@ import {
 import {
   buildCitationParts,
   buildDynamicToolParts,
+  collectToolSnapshotsFromMessagesEvent,
   collectToolSnapshotsFromUpdate,
   createAutoThreadTitle,
   extractLangChainChunkText,
@@ -388,6 +389,14 @@ export const buildChatRoutes = ({
             signal: abortController.signal,
           })) {
             if (event.type === "messages" && Array.isArray(event.data)) {
+              const toolChunks = collectToolSnapshotsFromMessagesEvent(
+                event.data,
+                toolSnapshots,
+              );
+              for (const chunk of toolChunks) {
+                writer.write(chunk);
+              }
+
               const message = event.data[0];
               const metadata = event.data[1];
               const delta = extractLangChainChunkText(message, metadata);

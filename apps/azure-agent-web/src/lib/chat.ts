@@ -352,6 +352,135 @@ const getToolMessagesFromUpdateNode = (value: unknown): unknown[] => {
   return [];
 };
 
+const collectToolSnapshotsFromMessages = (
+  messages: unknown[],
+  toolSnapshots: Map<string, ToolSnapshot>,
+): ToolStreamChunk[] => {
+  const chunks: ToolStreamChunk[] = [];
+
+  for (const message of messages) {
+    if (!message || typeof message !== "object") {
+      continue;
+    }
+
+    const messageType =
+      "type" in message && typeof message.type === "string" ? message.type : "";
+
+    if (messageType === "ai") {
+      const toolCalls =
+        "tool_calls" in message && Array.isArray(message.tool_calls)
+          ? message.tool_calls
+          : [];
+
+      for (const toolCall of toolCalls) {
+        if (!toolCall || typeof toolCall !== "object") {
+          continue;
+        }
+
+        const toolCallId =
+          "id" in toolCall && typeof toolCall.id === "string"
+            ? toolCall.id
+            : undefined;
+        const toolName =
+          "name" in toolCall && typeof toolCall.name === "string"
+            ? toolCall.name
+            : undefined;
+
+        if (!toolCallId || !toolName) {
+          continue;
+        }
+
+        const input = "args" in toolCall ? toolCall.args : undefined;
+
+        toolSnapshots.set(toolCallId, {
+          toolCallId,
+          toolName,
+          input,
+          output: toolSnapshots.get(toolCallId)?.output,
+          errorText: toolSnapshots.get(toolCallId)?.errorText,
+          state:
+            toolSnapshots.get(toolCallId)?.state === "output-available" ||
+            toolSnapshots.get(toolCallId)?.state === "output-error"
+              ? toolSnapshots.get(toolCallId)!.state
+              : "input-available",
+        });
+        chunks.push({
+          type: "tool-input-available",
+          toolCallId,
+          toolName,
+          input,
+          dynamic: true,
+        });
+      }
+
+      continue;
+    }
+
+    if (messageType === "tool") {
+      const toolCallId =
+        "tool_call_id" in message && typeof message.tool_call_id === "string"
+          ? message.tool_call_id
+          : undefined;
+      if (!toolCallId) {
+        continue;
+      }
+
+      const previous = toolSnapshots.get(toolCallId);
+      const toolName =
+        ("name" in message && typeof message.name === "string"
+          ? message.name
+          : undefined) ?? previous?.toolName;
+
+      if (!toolName) {
+        continue;
+      }
+
+      const status =
+        "status" in message && typeof message.status === "string"
+          ? message.status
+          : "success";
+      const normalizedContent = normalizeToolContent(
+        "content" in message ? message.content : undefined,
+      );
+
+      toolSnapshots.set(toolCallId, {
+        toolCallId,
+        toolName,
+        input: previous?.input,
+        output: status === "success" ? normalizedContent : undefined,
+        errorText:
+          status === "success"
+            ? undefined
+            : typeof normalizedContent === "string"
+              ? normalizedContent
+              : JSON.stringify(normalizedContent),
+        state: status === "success" ? "output-available" : "output-error",
+      });
+
+      if (status === "success") {
+        chunks.push({
+          type: "tool-output-available",
+          toolCallId,
+          output: normalizedContent,
+          dynamic: true,
+        });
+      } else {
+        chunks.push({
+          type: "tool-output-error",
+          toolCallId,
+          errorText:
+            typeof normalizedContent === "string"
+              ? normalizedContent
+              : JSON.stringify(normalizedContent),
+          dynamic: true,
+        });
+      }
+    }
+  }
+
+  return chunks;
+};
+
 export const collectToolSnapshotsFromUpdate = (
   update: unknown,
   toolSnapshots: Map<string, ToolSnapshot>,
@@ -363,134 +492,19 @@ export const collectToolSnapshotsFromUpdate = (
 
   for (const nodeValue of Object.values(update)) {
     const messages = getToolMessagesFromUpdateNode(nodeValue);
-
-    for (const message of messages) {
-      if (!message || typeof message !== "object") {
-        continue;
-      }
-
-      const messageType =
-        "type" in message && typeof message.type === "string"
-          ? message.type
-          : "";
-
-      if (messageType === "ai") {
-        const toolCalls =
-          "tool_calls" in message && Array.isArray(message.tool_calls)
-            ? message.tool_calls
-            : [];
-
-        for (const toolCall of toolCalls) {
-          if (!toolCall || typeof toolCall !== "object") {
-            continue;
-          }
-
-          const toolCallId =
-            "id" in toolCall && typeof toolCall.id === "string"
-              ? toolCall.id
-              : undefined;
-          const toolName =
-            "name" in toolCall && typeof toolCall.name === "string"
-              ? toolCall.name
-              : undefined;
-
-          if (!toolCallId || !toolName) {
-            continue;
-          }
-
-          const input =
-            "args" in toolCall
-              ? toolCall.args
-              : undefined;
-
-          toolSnapshots.set(toolCallId, {
-            toolCallId,
-            toolName,
-            input,
-            output: toolSnapshots.get(toolCallId)?.output,
-            errorText: toolSnapshots.get(toolCallId)?.errorText,
-            state:
-              toolSnapshots.get(toolCallId)?.state === "output-available" ||
-              toolSnapshots.get(toolCallId)?.state === "output-error"
-                ? toolSnapshots.get(toolCallId)!.state
-                : "input-available",
-          });
-          chunks.push({
-            type: "tool-input-available",
-            toolCallId,
-            toolName,
-            input,
-            dynamic: true,
-          });
-        }
-
-        continue;
-      }
-
-      if (messageType === "tool") {
-        const toolCallId =
-          "tool_call_id" in message && typeof message.tool_call_id === "string"
-            ? message.tool_call_id
-            : undefined;
-        if (!toolCallId) {
-          continue;
-        }
-
-        const previous = toolSnapshots.get(toolCallId);
-        const toolName =
-          ("name" in message && typeof message.name === "string"
-            ? message.name
-            : undefined) ?? previous?.toolName;
-
-        if (!toolName) {
-          continue;
-        }
-
-        const status =
-          "status" in message && typeof message.status === "string"
-            ? message.status
-            : "success";
-        const normalizedContent = normalizeToolContent(
-          "content" in message ? message.content : undefined,
-        );
-
-        toolSnapshots.set(toolCallId, {
-          toolCallId,
-          toolName,
-          input: previous?.input,
-          output: status === "success" ? normalizedContent : undefined,
-          errorText:
-            status === "success"
-              ? undefined
-              : typeof normalizedContent === "string"
-                ? normalizedContent
-                : JSON.stringify(normalizedContent),
-          state: status === "success" ? "output-available" : "output-error",
-        });
-
-        if (status === "success") {
-          chunks.push({
-            type: "tool-output-available",
-            toolCallId,
-            output: normalizedContent,
-            dynamic: true,
-          });
-        } else {
-          chunks.push({
-            type: "tool-output-error",
-            toolCallId,
-            errorText:
-              typeof normalizedContent === "string"
-                ? normalizedContent
-                : JSON.stringify(normalizedContent),
-            dynamic: true,
-          });
-        }
-      }
-    }
+    chunks.push(...collectToolSnapshotsFromMessages(messages, toolSnapshots));
   }
 
   return chunks;
+};
+
+export const collectToolSnapshotsFromMessagesEvent = (
+  data: unknown,
+  toolSnapshots: Map<string, ToolSnapshot>,
+): ToolStreamChunk[] => {
+  return Array.isArray(data)
+    ? collectToolSnapshotsFromMessages(data, toolSnapshots)
+    : [];
 };
 
 export const buildDynamicToolParts = (
