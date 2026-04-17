@@ -102,14 +102,20 @@ const ThreadListItem: FC = () => {
       return;
     }
 
-    const input = inputRef.current;
-    if (!input) {
-      return;
-    }
+    const frame = requestAnimationFrame(() => {
+      const input = inputRef.current;
+      if (!input) {
+        return;
+      }
 
-    input.focus();
-    const end = input.value.length;
-    input.setSelectionRange(end, end);
+      input.focus();
+      const end = input.value.length;
+      input.setSelectionRange(end, end);
+    });
+
+    return () => {
+      cancelAnimationFrame(frame);
+    };
   }, [isEditing]);
 
   return (
@@ -172,7 +178,15 @@ const ThreadListItem: FC = () => {
               <EllipsisIcon className="size-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="bottom">
+          <DropdownMenuContent
+            align="end"
+            side="bottom"
+            onCloseAutoFocus={(event) => {
+              if (isEditing) {
+                event.preventDefault();
+              }
+            }}
+          >
             <DropdownMenuItem
               disabled={!canRename}
               onSelect={(event) => {
