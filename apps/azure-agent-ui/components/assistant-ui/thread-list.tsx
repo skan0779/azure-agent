@@ -100,7 +100,10 @@ const ThreadListItem: FC = () => {
     <ThreadListItemPrimitive.Root className="group/thread-item">
       <div className="flex items-center gap-1">
         <ThreadListItemPrimitive.Trigger
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]"
+          className={cn(
+            "flex min-w-0 flex-1 items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-[#cdcdcd] transition hover:bg-white/5 hover:text-[#f2f2f2] data-[active=true]:bg-white/10 data-[active=true]:text-[#f8f8f8]",
+            isEditing && "bg-white/10 text-[#f8f8f8]",
+          )}
           onClick={() => {
             if (isMobile) {
               setOpenMobile(false);
@@ -110,10 +113,13 @@ const ThreadListItem: FC = () => {
           <MessageSquareText className="size-4 shrink-0 opacity-70" />
           <div
             className={cn(
-              "min-w-0 flex-1 truncate",
+              "relative min-w-0 flex-1 truncate",
               "group-data-[active=true]/thread-item:text-[#f8f8f8]",
             )}
           >
+            {isEditing ? (
+              <div className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#f3f3f3]" />
+            ) : null}
             {isEditing ? (
               <input
                 autoFocus
@@ -134,7 +140,7 @@ const ThreadListItem: FC = () => {
                     setIsEditing(false);
                   }
                 }}
-                className="w-full rounded-md bg-transparent text-[#f8f8f8] outline-none placeholder:text-[#7f7f7f]"
+                className="w-full rounded-md bg-transparent pl-3 text-[#f8f8f8] outline-none placeholder:text-[#7f7f7f] caret-[#f8f8f8]"
                 aria-label="Rename thread"
               />
             ) : (
