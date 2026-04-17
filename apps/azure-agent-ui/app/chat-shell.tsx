@@ -48,6 +48,38 @@ const extractJobId = (value: unknown): string | null => {
   return value.jobId;
 };
 
+const extractUserMessageText = (message: unknown): string | null => {
+  if (!message || typeof message !== "object") {
+    return null;
+  }
+
+  if ("content" in message && typeof message.content === "string") {
+    const content = message.content.trim();
+    return content.length > 0 ? content : null;
+  }
+
+  if ("parts" in message && Array.isArray(message.parts)) {
+    const text = message.parts
+      .map((part) => {
+        if (!part || typeof part !== "object") {
+          return "";
+        }
+
+        if ("type" in part && part.type === "text") {
+          return "text" in part && typeof part.text === "string" ? part.text : "";
+        }
+
+        return "";
+      })
+      .join("")
+      .trim();
+
+    return text.length > 0 ? text : null;
+  }
+
+  return null;
+};
+
 const isCitationPart = (part: unknown): boolean => {
   if (!part || typeof part !== "object" || !("type" in part)) {
     return false;
@@ -118,9 +150,11 @@ const useLocalChatThreadRuntime = ({
   apiBaseUrl: string;
   userId: string;
 }) => {
+  const aui = useAui();
   const assistantRuntime = useAssistantRuntime();
   const threadId = useAuiState((s) => s.threadListItem.id);
   const remoteId = useAuiState((s) => s.threadListItem.remoteId);
+  const currentTitle = useAuiState((s) => s.threadListItem.title ?? "New chat");
   const runtimeThreadKey = remoteId ?? threadId;
   const chatStoreThreadIdRef = useRef<string | null>(null);
   const chatStoreKeyRef = useRef<string>("");
@@ -204,6 +238,7 @@ const useLocalChatThreadRuntime = ({
   const lastObservedUserMessageIdRef = useRef<string | null>(null);
   const lastUpdatedUserMessageKeyRef = useRef<string | null>(null);
   const lastRuntimeThreadKeyRef = useRef<string | null>(null);
+  const lastOptimisticTitleUpdateKeyRef = useRef<string | null>(null);
   const setMessagesRef = useRef(chat.setMessages);
 
   useEffect(() => {
@@ -290,6 +325,10 @@ const useLocalChatThreadRuntime = ({
     [...chat.messages]
       .reverse()
       .find((message) => message.role === "user")?.id ?? null;
+  const latestUserText =
+    extractUserMessageText(
+      [...chat.messages].reverse().find((message) => message.role === "user"),
+    ) ?? null;
 
   useEffect(() => {
     if (!remoteId) {
@@ -327,6 +366,7 @@ const useLocalChatThreadRuntime = ({
         remoteId && latestUserMessageId
           ? `${remoteId}:${latestUserMessageId}`
           : null;
+      lastOptimisticTitleUpdateKeyRef.current = null;
       return;
     }
 
@@ -354,6 +394,24 @@ const useLocalChatThreadRuntime = ({
     }
     lastUpdatedUserMessageKeyRef.current = updateKey;
   }, [latestUserMessageId, remoteId, runtimeThreadKey]);
+
+  useEffect(() => {
+    if (!remoteId || !latestUserMessageId || !latestUserText) {
+      return;
+    }
+
+    if (currentTitle !== "New chat") {
+      return;
+    }
+
+    const optimisticUpdateKey = `${remoteId}:${latestUserMessageId}`;
+    if (lastOptimisticTitleUpdateKeyRef.current === optimisticUpdateKey) {
+      return;
+    }
+
+    lastOptimisticTitleUpdateKeyRef.current = optimisticUpdateKey;
+    void aui.threadListItem().rename(latestUserText);
+  }, [aui, currentTitle, latestUserMessageId, latestUserText, remoteId]);
 
   const runtime = useAISDKRuntime({
     ...chat,
