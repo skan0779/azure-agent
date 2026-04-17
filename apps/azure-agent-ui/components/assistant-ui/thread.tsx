@@ -58,16 +58,12 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
     return toSerializableCitation(candidate.data);
   }
 
-  if (candidate.type === "data-citation") {
-    return toSerializableCitation(candidate.data);
-  }
-
-  if (candidate.type !== "citation") {
-    if ("href" in candidate || "citationId" in candidate) {
-      // fall through for nested citation payloads stored inside data-citation
-    } else {
-      return null;
-    }
+  if (
+    !("href" in candidate) &&
+    !("citationId" in candidate) &&
+    !("title" in candidate)
+  ) {
+    return null;
   }
 
   if (typeof candidate.href !== "string" || candidate.href.length === 0) {

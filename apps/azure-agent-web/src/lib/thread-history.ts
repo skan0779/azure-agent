@@ -45,19 +45,6 @@ const citationTypeSchema = z.enum([
   "other",
 ]);
 
-const citationPartSchema = z.object({
-  type: z.literal("citation"),
-  citationId: z.string().min(1),
-  href: z.string().url(),
-  title: z.string().min(1),
-  snippet: z.string().optional(),
-  domain: z.string().optional(),
-  favicon: z.string().optional(),
-  author: z.string().optional(),
-  publishedAt: z.string().optional(),
-  citationType: citationTypeSchema.optional(),
-});
-
 const filePartSchema = z.object({
   type: z.literal("file"),
   mimeType: z.string().min(1),
@@ -71,7 +58,8 @@ const stepStartPartSchema = z.object({
 
 const dataPartSchema = z
   .object({
-    type: z.string().regex(/^data-/),
+    type: z.literal("data"),
+    name: z.string().min(1),
     id: z.string().optional(),
     data: z.unknown(),
   })
@@ -146,7 +134,6 @@ export const uiMessagePartSchema = z.union([
   textPartSchema,
   reasoningPartSchema,
   dynamicToolPartSchema,
-  citationPartSchema,
   filePartSchema,
   dataPartSchema,
   stepStartPartSchema,
@@ -158,6 +145,69 @@ export const uiMessageSchema = z.object({
   metadata: z.unknown().optional(),
   parts: z.array(uiMessagePartSchema),
 });
+
+const normalizeLegacyCitationPart = (part: Record<string, unknown>) => {
+  if (part.type === "data-citation") {
+    return {
+      type: "data",
+      name: "citation",
+      id: typeof part.id === "string" ? part.id : undefined,
+      data: part.data,
+    };
+  }
+
+  if (part.type === "citation") {
+    const citationId =
+      typeof part.citationId === "string" && part.citationId.length > 0
+        ? part.citationId
+        : typeof part.id === "string" && part.id.length > 0
+          ? part.id
+          : undefined;
+
+    return {
+      type: "data",
+      name: "citation",
+      id: citationId,
+      data: {
+        citationId,
+        href: typeof part.href === "string" ? part.href : undefined,
+        title: typeof part.title === "string" ? part.title : undefined,
+        snippet: typeof part.snippet === "string" ? part.snippet : undefined,
+        domain: typeof part.domain === "string" ? part.domain : undefined,
+        favicon: typeof part.favicon === "string" ? part.favicon : undefined,
+        author: typeof part.author === "string" ? part.author : undefined,
+        publishedAt:
+          typeof part.publishedAt === "string" ? part.publishedAt : undefined,
+        citationType:
+          typeof part.citationType === "string" ? part.citationType : undefined,
+      },
+    };
+  }
+
+  return part;
+};
+
+export const normalizeStoredUiMessage = (message: {
+  id: string;
+  role: "system" | "user" | "assistant";
+  metadata?: unknown;
+  parts: unknown;
+}) => {
+  const normalizedParts = Array.isArray(message.parts)
+    ? message.parts.map((part) => {
+        if (!part || typeof part !== "object") {
+          return part;
+        }
+
+        return normalizeLegacyCitationPart(part as Record<string, unknown>);
+      })
+    : message.parts;
+
+  return {
+    ...message,
+    parts: normalizedParts,
+  };
+};
 
 export const listThreadMessagesResponseSchema = z.array(uiMessageSchema);
 

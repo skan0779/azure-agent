@@ -1,4 +1,8 @@
-import { listThreadMessagesResponseSchema, listThreadsResponseSchema } from "./thread-history.js";
+import {
+  listThreadMessagesResponseSchema,
+  listThreadsResponseSchema,
+  normalizeStoredUiMessage,
+} from "./thread-history.js";
 import type {
   ListThreadMessagesResponse,
   ListThreadsResponse,
@@ -126,12 +130,14 @@ export class ThreadRepository {
     );
 
     return listThreadMessagesResponseSchema.parse(
-      result.rows.map((row) => ({
-        id: row.id,
-        role: row.role,
-        metadata: row.metadata ?? undefined,
-        parts: row.parts,
-      })),
+      result.rows.map((row) =>
+        normalizeStoredUiMessage({
+          id: row.id,
+          role: row.role,
+          metadata: row.metadata ?? undefined,
+          parts: row.parts,
+        }),
+      ),
     );
   }
 
