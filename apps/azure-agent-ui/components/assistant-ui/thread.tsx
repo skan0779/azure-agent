@@ -54,8 +54,16 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
 
   const candidate = part as Record<string, unknown>;
 
+  if (candidate.type === "data-citation") {
+    return toSerializableCitation(candidate.data);
+  }
+
   if (candidate.type !== "citation") {
-    return null;
+    if ("href" in candidate || "citationId" in candidate) {
+      // fall through for nested citation payloads stored inside data-citation
+    } else {
+      return null;
+    }
   }
 
   if (typeof candidate.href !== "string" || candidate.href.length === 0) {
@@ -89,25 +97,6 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
         ? (candidate.citationType as SerializableCitation["type"])
         : undefined,
   };
-};
-
-const extractSerializableCitationsFromMetadata = (
-  metadata: unknown,
-): SerializableCitation[] => {
-  if (!metadata || typeof metadata !== "object") {
-    return [];
-  }
-
-  const candidate = metadata as Record<string, unknown>;
-  const citations = candidate.citations;
-  if (!Array.isArray(citations)) {
-    return [];
-  }
-
-  return citations.flatMap((citation): SerializableCitation[] => {
-    const parsed = toSerializableCitation(citation);
-    return parsed ? [parsed] : [];
-  });
 };
 
 export const Thread: FC = () => {
@@ -364,10 +353,13 @@ const EditComposer: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
-  const messageMetadata = useAuiState((s) => s.message.metadata);
+  const messageContent = useAuiState((s) => s.message.content);
   const citations = useMemo(() => {
-    return extractSerializableCitationsFromMetadata(messageMetadata);
-  }, [messageMetadata]);
+    return messageContent.flatMap((part): SerializableCitation[] => {
+      const citation = toSerializableCitation(part);
+      return citation ? [citation] : [];
+    });
+  }, [messageContent]);
 
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl">

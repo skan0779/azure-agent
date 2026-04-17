@@ -134,7 +134,7 @@ const useLocalChatThreadRuntime = ({
   const syncMessagesFromServerRef = useRef<
     | ((
         targetThreadId: string,
-        options: { context: string; mode?: "replace" | "merge-latest-assistant-metadata" },
+        options: { context: string; mode?: "replace" | "merge-latest-assistant-citations" },
       ) => Promise<void>)
     | null
   >(null);
@@ -182,7 +182,7 @@ const useLocalChatThreadRuntime = ({
 
       void syncMessagesFromServerRef.current(targetThreadId, {
         context: "refresh thread messages after response",
-        mode: "merge-latest-assistant-metadata",
+        mode: "merge-latest-assistant-citations",
       });
     },
     onError: () => {
@@ -225,7 +225,7 @@ const useLocalChatThreadRuntime = ({
       {
         context,
         mode = "replace",
-      }: { context: string; mode?: "replace" | "merge-latest-assistant-metadata" },
+      }: { context: string; mode?: "replace" | "merge-latest-assistant-citations" },
     ) => {
       try {
         const messages = await getThreadMessages({
@@ -260,7 +260,22 @@ const useLocalChatThreadRuntime = ({
           index === currentAssistantIndex
             ? {
                 ...message,
-                metadata: serverAssistant.metadata,
+                parts: [
+                  ...message.parts.filter(
+                    (part) =>
+                      !part ||
+                      typeof part !== "object" ||
+                      !("type" in part) ||
+                      part.type !== "data-citation",
+                  ),
+                  ...serverAssistant.parts.filter(
+                    (part) =>
+                      part &&
+                      typeof part === "object" &&
+                      "type" in part &&
+                      part.type === "data-citation",
+                  ),
+                ],
               }
             : message,
         );

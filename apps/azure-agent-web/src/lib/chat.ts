@@ -238,10 +238,19 @@ type DynamicToolPart = Extract<
   { type: "dynamic-tool" }
 >;
 
-type CitationPart = Extract<
-  UIMessage["parts"][number],
-  { type: "citation" }
->;
+type CitationDataPart = {
+  type: "data-citation";
+  id: string;
+  data: {
+    citationId: string;
+    href: string;
+    title: string;
+    snippet?: string;
+    domain?: string;
+    favicon?: string;
+    citationType?: "webpage" | "document" | "article" | "api" | "code" | "other";
+  };
+};
 
 type ToolSnapshot = {
   toolName: string;
@@ -522,8 +531,8 @@ export const buildDynamicToolParts = (
 
 export const buildCitationParts = (
   toolSnapshots: Map<string, ToolSnapshot>,
-): CitationPart[] => {
-  const citations: CitationPart[] = [];
+): CitationDataPart[] => {
+  const citations: CitationDataPart[] = [];
 
   for (const snapshot of toolSnapshots.values()) {
     if (snapshot.state !== "output-available") {
@@ -558,14 +567,17 @@ export const buildCitationParts = (
             : undefined;
 
       citations.push({
-        type: "citation",
-        citationId: `${snapshot.toolCallId}:${index}`,
-        href,
-        title,
-        snippet,
-        domain,
-        favicon: getFaviconUrl(domain),
-        citationType: "article",
+        type: "data-citation",
+        id: `${snapshot.toolCallId}:${index}`,
+        data: {
+          citationId: `${snapshot.toolCallId}:${index}`,
+          href,
+          title,
+          snippet,
+          domain,
+          favicon: getFaviconUrl(domain),
+          citationType: "article",
+        },
       });
     }
   }
