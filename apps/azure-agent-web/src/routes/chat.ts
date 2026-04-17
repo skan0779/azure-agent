@@ -521,9 +521,14 @@ export const buildChatRoutes = ({
                 message: {
                   id: assistantMessageId,
                   role: "assistant",
+                  metadata:
+                    citationParts.length > 0
+                      ? {
+                          citations: citationParts,
+                        }
+                      : undefined,
                   parts: [
                     ...toolParts,
-                    ...citationParts,
                     ...(assistantText.trim()
                       ? [
                           {

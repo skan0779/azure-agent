@@ -134,10 +134,11 @@ const useLocalChatThreadRuntime = ({
   const syncMessagesFromServerRef = useRef<
     | ((
         targetThreadId: string,
-        options: { context: string },
+        options: { context: string; mode?: "replace" | "merge-latest-assistant-metadata" },
       ) => Promise<void>)
     | null
   >(null);
+  const messagesRef = useRef<ReturnType<typeof useChat>["messages"]>([]);
 
   if (chatStoreThreadIdRef.current !== threadId) {
     chatStoreThreadIdRef.current = threadId;
@@ -181,6 +182,7 @@ const useLocalChatThreadRuntime = ({
 
       void syncMessagesFromServerRef.current(targetThreadId, {
         context: "refresh thread messages after response",
+        mode: "merge-latest-assistant-metadata",
       });
     },
     onError: () => {
@@ -213,10 +215,17 @@ const useLocalChatThreadRuntime = ({
     setMessagesRef.current = chat.setMessages;
   }, [chat.setMessages]);
 
+  useEffect(() => {
+    messagesRef.current = chat.messages;
+  }, [chat.messages]);
+
   const syncMessagesFromServer = useCallback(
     async (
       targetThreadId: string,
-      { context }: { context: string },
+      {
+        context,
+        mode = "replace",
+      }: { context: string; mode?: "replace" | "merge-latest-assistant-metadata" },
     ) => {
       try {
         const messages = await getThreadMessages({
@@ -225,7 +234,38 @@ const useLocalChatThreadRuntime = ({
           threadId: targetThreadId,
         });
 
-        setMessagesRef.current(messages);
+        if (mode === "replace") {
+          setMessagesRef.current(messages);
+          return;
+        }
+
+        const currentMessages = messagesRef.current;
+        const currentAssistantIndex = [...currentMessages]
+          .map((message, index) => ({ message, index }))
+          .reverse()
+          .find(({ message }) => message.role === "assistant")?.index;
+        const serverAssistant = [...messages]
+          .reverse()
+          .find((message) => message.role === "assistant");
+
+        if (
+          currentAssistantIndex === undefined ||
+          currentAssistantIndex < 0 ||
+          !serverAssistant
+        ) {
+          return;
+        }
+
+        const mergedMessages = currentMessages.map((message, index) =>
+          index === currentAssistantIndex
+            ? {
+                ...message,
+                metadata: serverAssistant.metadata,
+              }
+            : message,
+        );
+
+        setMessagesRef.current(mergedMessages);
       } catch (error) {
         console.warn(`Failed to ${context}`, {
           threadId: targetThreadId,

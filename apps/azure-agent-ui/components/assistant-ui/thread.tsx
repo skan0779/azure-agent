@@ -91,6 +91,25 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
   };
 };
 
+const extractSerializableCitationsFromMetadata = (
+  metadata: unknown,
+): SerializableCitation[] => {
+  if (!metadata || typeof metadata !== "object") {
+    return [];
+  }
+
+  const candidate = metadata as Record<string, unknown>;
+  const citations = candidate.citations;
+  if (!Array.isArray(citations)) {
+    return [];
+  }
+
+  return citations.flatMap((citation): SerializableCitation[] => {
+    const parsed = toSerializableCitation(citation);
+    return parsed ? [parsed] : [];
+  });
+};
+
 export const Thread: FC = () => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
@@ -345,13 +364,10 @@ const EditComposer: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
-  const messageContent = useAuiState((s) => s.message.content);
+  const messageMetadata = useAuiState((s) => s.message.metadata);
   const citations = useMemo(() => {
-    return messageContent.flatMap((part): SerializableCitation[] => {
-      const citation = toSerializableCitation(part);
-      return citation ? [citation] : [];
-    });
-  }, [messageContent]);
+    return extractSerializableCitationsFromMetadata(messageMetadata);
+  }, [messageMetadata]);
 
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl">
