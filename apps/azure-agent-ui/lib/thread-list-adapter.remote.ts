@@ -22,7 +22,16 @@ type RemoteThreadListResponse = {
   threads: RemoteThreadMetadata[];
 };
 
-const EMPTY_TITLE_STREAM = new ReadableStream();
+type GenerateTitleStream = Awaited<
+  ReturnType<RemoteThreadListAdapter["generateTitle"]>
+>;
+
+const createEmptyTitleStream = (): GenerateTitleStream =>
+  new ReadableStream({
+    start(controller) {
+      controller.close();
+    },
+  }) as GenerateTitleStream;
 
 const toMetadata = (thread: {
   id: string;
@@ -84,7 +93,7 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
   }
 
   async generateTitle() {
-    return EMPTY_TITLE_STREAM;
+    return createEmptyTitleStream();
   }
 
   async fetch(threadId: string): Promise<RemoteThreadMetadata> {
