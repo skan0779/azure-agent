@@ -345,12 +345,13 @@ const EditComposer: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
-  const citations = useAuiState((s) => {
-    return s.message.content.flatMap((part): SerializableCitation[] => {
+  const messageContent = useAuiState((s) => s.message.content);
+  const citations = useMemo(() => {
+    return messageContent.flatMap((part): SerializableCitation[] => {
       const citation = toSerializableCitation(part);
       return citation ? [citation] : [];
     });
-  });
+  }, [messageContent]);
 
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl">
