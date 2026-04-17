@@ -9,6 +9,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 import {
+  EllipsisIcon,
   MessageSquareText,
   PencilIcon,
   PlusIcon,
@@ -16,6 +17,13 @@ import {
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/ui/sidebar";
 
 export const ThreadList: FC = () => {
@@ -134,29 +142,46 @@ const ThreadListItem: FC = () => {
             )}
           </div>
         </ThreadListItemPrimitive.Trigger>
-        <button
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            if (!canRename) {
-              return;
-            }
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              onClick={(event) => event.stopPropagation()}
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-0 transition hover:bg-white/10 hover:text-[#f3f3f3] group-hover/thread-item:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+              aria-label="Thread actions"
+            >
+              <EllipsisIcon className="size-4" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="bottom">
+            <DropdownMenuItem
+              disabled={!canRename}
+              onSelect={(event) => {
+                event.preventDefault();
+                if (!canRename) {
+                  return;
+                }
 
-            setDraftTitle(title);
-            setIsEditing(true);
-          }}
-          disabled={!canRename}
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-0 transition hover:bg-white/10 hover:text-[#f3f3f3] group-hover/thread-item:opacity-100 focus-visible:opacity-100 disabled:pointer-events-none disabled:opacity-0"
-          aria-label="Rename thread"
-        >
-          <PencilIcon className="size-4" />
-        </button>
-        <ThreadListItemPrimitive.Delete
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-0 transition hover:bg-white/10 hover:text-[#f3f3f3] group-hover/thread-item:opacity-100 focus-visible:opacity-100"
-          aria-label="Delete thread"
-        >
-          <Trash2Icon className="size-4" />
-        </ThreadListItemPrimitive.Delete>
+                setDraftTitle(title);
+                setIsEditing(true);
+              }}
+            >
+              <PencilIcon className="size-4" />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-[#ffb4b4] focus:bg-red-500/15 focus:text-[#ffd0d0]"
+              onSelect={(event) => {
+                event.preventDefault();
+                void aui.threadListItem().delete();
+              }}
+            >
+              <Trash2Icon className="size-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </ThreadListItemPrimitive.Root>
   );
