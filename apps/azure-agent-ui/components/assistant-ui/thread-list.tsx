@@ -1,6 +1,6 @@
 "use client";
 
-import { type FC, useState } from "react";
+import { type FC, useEffect, useRef, useState } from "react";
 import {
   AuiIf,
   ThreadListItemPrimitive,
@@ -77,6 +77,7 @@ const ThreadListItem: FC = () => {
   const isMain = useAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
   const [isEditing, setIsEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const canRename = status !== "new";
 
@@ -96,6 +97,21 @@ const ThreadListItem: FC = () => {
     aui.threadListItem().rename(nextTitle);
   };
 
+  useEffect(() => {
+    if (!isEditing) {
+      return;
+    }
+
+    const input = inputRef.current;
+    if (!input) {
+      return;
+    }
+
+    input.focus();
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+  }, [isEditing]);
+
   return (
     <ThreadListItemPrimitive.Root className="group/thread-item">
       <div className="flex items-center gap-1">
@@ -113,16 +129,13 @@ const ThreadListItem: FC = () => {
           <MessageSquareText className="size-4 shrink-0 opacity-70" />
           <div
             className={cn(
-              "relative min-w-0 flex-1 truncate",
+              "min-w-0 flex-1 truncate",
               "group-data-[active=true]/thread-item:text-[#f8f8f8]",
             )}
           >
             {isEditing ? (
-              <div className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[#f3f3f3]" />
-            ) : null}
-            {isEditing ? (
               <input
-                autoFocus
+                ref={inputRef}
                 value={draftTitle}
                 onChange={(event) => setDraftTitle(event.target.value)}
                 onBlur={commitRename}
@@ -140,7 +153,7 @@ const ThreadListItem: FC = () => {
                     setIsEditing(false);
                   }
                 }}
-                className="w-full rounded-md bg-transparent pl-3 text-[#f8f8f8] outline-none placeholder:text-[#7f7f7f] caret-[#f8f8f8]"
+                className="w-full rounded-md bg-transparent text-[#f8f8f8] outline-none placeholder:text-[#7f7f7f] caret-[#f8f8f8]"
                 aria-label="Rename thread"
               />
             ) : (
