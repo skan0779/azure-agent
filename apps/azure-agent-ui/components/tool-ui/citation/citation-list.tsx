@@ -438,7 +438,7 @@ function StackedCitations({
         <PopoverContent
           side="bottom"
           align="start"
-          className="w-80 p-1"
+          className="w-80 border border-white/10 bg-[#171717]/98 p-1 text-[#ececec] shadow-2xl backdrop-blur-md"
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
           onBlur={handleBlur}
