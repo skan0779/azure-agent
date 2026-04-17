@@ -239,8 +239,7 @@ type DynamicToolPart = Extract<
 >;
 
 type CitationDataPart = {
-  type: "data";
-  name: "citation";
+  type: "data-citation";
   id: string;
   data: {
     citationId: string;
@@ -587,8 +586,7 @@ export const buildCitationParts = (
             : undefined;
 
       citations.push({
-        type: "data",
-        name: "citation",
+        type: "data-citation",
         id: `${snapshot.toolCallId}:${index}`,
         data: {
           citationId: `${snapshot.toolCallId}:${index}`,

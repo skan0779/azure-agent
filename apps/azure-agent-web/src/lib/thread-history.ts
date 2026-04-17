@@ -58,8 +58,7 @@ const stepStartPartSchema = z.object({
 
 const dataPartSchema = z
   .object({
-    type: z.literal("data"),
-    name: z.string().min(1),
+    type: z.string().regex(/^data-/),
     id: z.string().optional(),
     data: z.unknown(),
   })
@@ -148,9 +147,12 @@ export const uiMessageSchema = z.object({
 
 const normalizeLegacyCitationPart = (part: Record<string, unknown>) => {
   if (part.type === "data-citation") {
+    return part;
+  }
+
+  if (part.type === "data" && part.name === "citation") {
     return {
-      type: "data",
-      name: "citation",
+      type: "data-citation",
       id: typeof part.id === "string" ? part.id : undefined,
       data: part.data,
     };
@@ -165,8 +167,7 @@ const normalizeLegacyCitationPart = (part: Record<string, unknown>) => {
           : undefined;
 
     return {
-      type: "data",
-      name: "citation",
+      type: "data-citation",
       id: citationId,
       data: {
         citationId,

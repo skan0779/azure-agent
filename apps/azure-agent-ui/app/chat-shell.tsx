@@ -53,6 +53,10 @@ const isCitationPart = (part: unknown): boolean => {
     return false;
   }
 
+  if (part.type === "data-citation") {
+    return true;
+  }
+
   return "name" in part && part.type === "data" && part.name === "citation";
 };
 
