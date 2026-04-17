@@ -174,7 +174,7 @@ const ThreadListItem: FC = () => {
             <button
               type="button"
               onClick={(event) => event.stopPropagation()}
-              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-0 transition hover:bg-white/10 hover:text-[#f3f3f3] group-hover/thread-item:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[#9f9f9f] opacity-100 transition hover:bg-white/10 hover:text-[#f3f3f3] md:opacity-0 md:group-hover/thread-item:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
               aria-label="Thread actions"
             >
               <EllipsisIcon className="size-4" />

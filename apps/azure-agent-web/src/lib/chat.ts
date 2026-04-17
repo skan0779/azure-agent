@@ -238,6 +238,11 @@ type DynamicToolPart = Extract<
   { type: "dynamic-tool" }
 >;
 
+type CitationPart = Extract<
+  UIMessage["parts"][number],
+  { type: "citation" }
+>;
+
 type ToolSnapshot = {
   toolName: string;
   toolCallId: string;
@@ -270,6 +275,34 @@ export type ToolStreamChunk =
       errorText: string;
       dynamic: true;
     };
+
+const getHostname = (value: string): string | undefined => {
+  try {
+    return new URL(value).hostname.replace(/^www\./, "");
+  } catch {
+    return undefined;
+  }
+};
+
+const getFaviconUrl = (hostname: string | undefined): string | undefined => {
+  if (!hostname) {
+    return undefined;
+  }
+
+  return `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`;
+};
+
+const getResultsFromToolOutput = (output: unknown): unknown[] => {
+  if (!output || typeof output !== "object") {
+    return [];
+  }
+
+  if ("results" in output && Array.isArray(output.results)) {
+    return output.results;
+  }
+
+  return [];
+};
 
 const normalizeToolContent = (content: unknown) => {
   if (typeof content === "string") {
@@ -485,4 +518,57 @@ export const buildDynamicToolParts = (
       input: snapshot.input,
     };
   });
+};
+
+export const buildCitationParts = (
+  toolSnapshots: Map<string, ToolSnapshot>,
+): CitationPart[] => {
+  const citations: CitationPart[] = [];
+
+  for (const snapshot of toolSnapshots.values()) {
+    if (snapshot.state !== "output-available") {
+      continue;
+    }
+
+    const results = getResultsFromToolOutput(snapshot.output);
+
+    for (let index = 0; index < results.length; index += 1) {
+      const result = results[index];
+      if (!result || typeof result !== "object") {
+        continue;
+      }
+
+      const href =
+        "url" in result && typeof result.url === "string" ? result.url : "";
+      const title =
+        "title" in result && typeof result.title === "string"
+          ? result.title
+          : "";
+
+      if (!href || !title) {
+        continue;
+      }
+
+      const domain = getHostname(href);
+      const snippet =
+        "content" in result && typeof result.content === "string"
+          ? result.content
+          : "raw_content" in result && typeof result.raw_content === "string"
+            ? result.raw_content
+            : undefined;
+
+      citations.push({
+        type: "citation",
+        citationId: `${snapshot.toolCallId}:${index}`,
+        href,
+        title,
+        snippet,
+        domain,
+        favicon: getFaviconUrl(domain),
+        citationType: "article",
+      });
+    }
+  }
+
+  return citations;
 };

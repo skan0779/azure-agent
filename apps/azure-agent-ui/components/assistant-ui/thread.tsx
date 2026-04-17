@@ -41,7 +41,55 @@ import {
 import { MarkdownText } from "@/components/assistant-ui/markdown-text";
 import { ToolFallback } from "@/components/assistant-ui/tool-fallback";
 import { TooltipIconButton } from "@/components/assistant-ui/tooltip-icon-button";
+import {
+  CitationList,
+  type SerializableCitation,
+} from "@/components/tool-ui/citation/index";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+
+const toSerializableCitation = (part: unknown): SerializableCitation | null => {
+  if (!part || typeof part !== "object") {
+    return null;
+  }
+
+  const candidate = part as Record<string, unknown>;
+
+  if (candidate.type !== "citation") {
+    return null;
+  }
+
+  if (typeof candidate.href !== "string" || candidate.href.length === 0) {
+    return null;
+  }
+
+  return {
+    id:
+      typeof candidate.citationId === "string" && candidate.citationId.length > 0
+        ? candidate.citationId
+        : typeof candidate.id === "string" && candidate.id.length > 0
+          ? candidate.id
+          : candidate.href,
+    href: candidate.href,
+    title:
+      typeof candidate.title === "string" && candidate.title.length > 0
+        ? candidate.title
+        : "Untitled source",
+    snippet:
+      typeof candidate.snippet === "string" ? candidate.snippet : undefined,
+    domain: typeof candidate.domain === "string" ? candidate.domain : undefined,
+    favicon:
+      typeof candidate.favicon === "string" ? candidate.favicon : undefined,
+    author: typeof candidate.author === "string" ? candidate.author : undefined,
+    publishedAt:
+      typeof candidate.publishedAt === "string"
+        ? candidate.publishedAt
+        : undefined,
+    type:
+      typeof candidate.citationType === "string"
+        ? (candidate.citationType as SerializableCitation["type"])
+        : undefined,
+  };
+};
 
 export const Thread: FC = () => {
   return (
@@ -297,6 +345,13 @@ const EditComposer: FC = () => {
 };
 
 const AssistantMessage: FC = () => {
+  const citations = useAuiState((s) => {
+    return s.message.content.flatMap((part): SerializableCitation[] => {
+      const citation = toSerializableCitation(part);
+      return citation ? [citation] : [];
+    });
+  });
+
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl">
       <div className="min-w-0 flex-1 pt-1">
@@ -339,7 +394,7 @@ const AssistantMessage: FC = () => {
           <MessageError />
         </div>
 
-        <div className="flex pt-2">
+        <div className="flex flex-wrap items-center gap-2 pt-2">
           <ActionBarPrimitive.Root
             hideWhenRunning
             autohide="not-last"
@@ -374,6 +429,13 @@ const AssistantMessage: FC = () => {
               </TooltipIconButton>
             </ActionBarPrimitive.Copy>
           </ActionBarPrimitive.Root>
+          {citations.length > 0 ? (
+            <CitationList
+              id={`message-citations-${citations[0]?.id ?? "unknown"}`}
+              citations={citations}
+              variant="stacked"
+            />
+          ) : null}
         </div>
 
         <MessageBranchPicker align="start" />

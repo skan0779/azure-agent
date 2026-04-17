@@ -10,6 +10,7 @@ import {
   streamAgentEvents,
 } from "../lib/azure-agent-api.js";
 import {
+  buildCitationParts,
   buildDynamicToolParts,
   collectToolSnapshotsFromUpdate,
   createAutoThreadTitle,
@@ -514,6 +515,7 @@ export const buildChatRoutes = ({
             if (threadRepository && (assistantText.trim() || toolSnapshots.size > 0)) {
               assistantMessageId ??= crypto.randomUUID();
               const toolParts = buildDynamicToolParts(toolSnapshots);
+              const citationParts = buildCitationParts(toolSnapshots);
               await threadRepository.upsertMessage({
                 threadId: resolvedThreadId,
                 message: {
@@ -521,6 +523,7 @@ export const buildChatRoutes = ({
                   role: "assistant",
                   parts: [
                     ...toolParts,
+                    ...citationParts,
                     ...(assistantText.trim()
                       ? [
                           {

@@ -36,19 +36,26 @@ const reasoningPartSchema = z.object({
   state: z.enum(["streaming", "done"]).optional(),
 });
 
-const sourceUrlPartSchema = z.object({
-  type: z.literal("source-url"),
-  sourceId: z.string().min(1),
-  url: z.string().url(),
-  title: z.string().optional(),
-});
+const citationTypeSchema = z.enum([
+  "webpage",
+  "document",
+  "article",
+  "api",
+  "code",
+  "other",
+]);
 
-const sourceDocumentPartSchema = z.object({
-  type: z.literal("source-document"),
-  sourceId: z.string().min(1),
-  mediaType: z.string().min(1),
+const citationPartSchema = z.object({
+  type: z.literal("citation"),
+  citationId: z.string().min(1),
+  href: z.string().url(),
   title: z.string().min(1),
-  filename: z.string().optional(),
+  snippet: z.string().optional(),
+  domain: z.string().optional(),
+  favicon: z.string().optional(),
+  author: z.string().optional(),
+  publishedAt: z.string().optional(),
+  citationType: citationTypeSchema.optional(),
 });
 
 const filePartSchema = z.object({
@@ -139,8 +146,7 @@ export const uiMessagePartSchema = z.union([
   textPartSchema,
   reasoningPartSchema,
   dynamicToolPartSchema,
-  sourceUrlPartSchema,
-  sourceDocumentPartSchema,
+  citationPartSchema,
   filePartSchema,
   dataPartSchema,
   stepStartPartSchema,

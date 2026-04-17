@@ -130,6 +130,14 @@ const useLocalChatThreadRuntime = ({
   const chatStoreThreadIdRef = useRef<string | null>(null);
   const chatStoreKeyRef = useRef<string>("");
   const currentJobIdRef = useRef<string | null>(null);
+  const remoteIdRef = useRef<string | null>(remoteId ?? null);
+  const syncMessagesFromServerRef = useRef<
+    | ((
+        targetThreadId: string,
+        options: { context: string },
+      ) => Promise<void>)
+    | null
+  >(null);
 
   if (chatStoreThreadIdRef.current !== threadId) {
     chatStoreThreadIdRef.current = threadId;
@@ -166,6 +174,14 @@ const useLocalChatThreadRuntime = ({
     },
     onFinish: () => {
       currentJobIdRef.current = null;
+      const targetThreadId = remoteIdRef.current;
+      if (!targetThreadId || !syncMessagesFromServerRef.current) {
+        return;
+      }
+
+      void syncMessagesFromServerRef.current(targetThreadId, {
+        context: "refresh thread messages after response",
+      });
     },
     onError: () => {
       currentJobIdRef.current = null;
@@ -219,6 +235,14 @@ const useLocalChatThreadRuntime = ({
     },
     [apiBaseUrl, userId],
   );
+
+  useEffect(() => {
+    remoteIdRef.current = remoteId ?? null;
+  }, [remoteId]);
+
+  useEffect(() => {
+    syncMessagesFromServerRef.current = syncMessagesFromServer;
+  }, [syncMessagesFromServer]);
 
   const latestUserMessageId =
     [...chat.messages]
