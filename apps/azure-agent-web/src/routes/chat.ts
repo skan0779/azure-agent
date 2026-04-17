@@ -372,6 +372,7 @@ export const buildChatRoutes = ({
           let textId: string | undefined;
           let sawText = false;
           let emittedStreamingStatus = false;
+          let loggedMessagesToolShape = false;
 
           app.log.info(
             {
@@ -389,12 +390,84 @@ export const buildChatRoutes = ({
             signal: abortController.signal,
           })) {
             if (event.type === "messages" && Array.isArray(event.data)) {
+              const toolSnapshotCountBefore = toolSnapshots.size;
               const toolChunks = collectToolSnapshotsFromMessagesEvent(
                 event.data,
                 toolSnapshots,
               );
               for (const chunk of toolChunks) {
                 writer.write(chunk);
+              }
+
+              const toolMessages = event.data.filter((message) => {
+                return (
+                  message &&
+                  typeof message === "object" &&
+                  "type" in message &&
+                  message.type === "tool"
+                );
+              });
+
+              if (toolMessages.length > 0) {
+                const firstToolMessage = toolMessages[0] as Record<string, unknown>;
+                const payload =
+                  "data" in firstToolMessage &&
+                  firstToolMessage.data &&
+                  typeof firstToolMessage.data === "object"
+                    ? (firstToolMessage.data as Record<string, unknown>)
+                    : firstToolMessage;
+
+                app.log.info(
+                  {
+                    requestId: request.id,
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                    toolMessageCount: toolMessages.length,
+                    toolChunksEmitted: toolChunks.length,
+                    toolSnapshotCountBefore,
+                    toolSnapshotCountAfter: toolSnapshots.size,
+                    firstToolMessageShape: {
+                      hasDataEnvelope:
+                        "data" in firstToolMessage &&
+                        !!firstToolMessage.data &&
+                        typeof firstToolMessage.data === "object",
+                      topLevelKeys: Object.keys(firstToolMessage).slice(0, 8),
+                      payloadKeys: Object.keys(payload).slice(0, 8),
+                      toolCallId:
+                        typeof payload.tool_call_id === "string"
+                          ? payload.tool_call_id
+                          : undefined,
+                      toolName:
+                        typeof payload.name === "string"
+                          ? payload.name
+                          : undefined,
+                      contentType: Array.isArray(payload.content)
+                        ? "array"
+                        : typeof payload.content,
+                      contentPreview:
+                        typeof payload.content === "string"
+                          ? payload.content.slice(0, 240)
+                          : undefined,
+                    },
+                  },
+                  "Collected tool snapshots from messages event",
+                );
+                loggedMessagesToolShape = true;
+              } else if (!loggedMessagesToolShape && toolChunks.length > 0) {
+                app.log.info(
+                  {
+                    requestId: request.id,
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                    toolChunksEmitted: toolChunks.length,
+                    toolSnapshotCountBefore,
+                    toolSnapshotCountAfter: toolSnapshots.size,
+                  },
+                  "Collected tool chunks from messages event without explicit tool messages",
+                );
+                loggedMessagesToolShape = true;
               }
 
               const message = event.data[0];
@@ -503,12 +576,32 @@ export const buildChatRoutes = ({
             });
 
             if (event.type === "updates") {
+              const toolSnapshotCountBefore = toolSnapshots.size;
               const toolChunks = collectToolSnapshotsFromUpdate(
                 event.data,
                 toolSnapshots,
               );
               for (const chunk of toolChunks) {
                 writer.write(chunk);
+              }
+
+              if (toolChunks.length > 0) {
+                app.log.info(
+                  {
+                    requestId: request.id,
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                    toolChunksEmitted: toolChunks.length,
+                    toolSnapshotCountBefore,
+                    toolSnapshotCountAfter: toolSnapshots.size,
+                    updateNodeKeys:
+                      event.data && typeof event.data === "object"
+                        ? Object.keys(event.data).slice(0, 8)
+                        : [],
+                  },
+                  "Collected tool snapshots from updates event",
+                );
               }
             }
           }
@@ -525,6 +618,26 @@ export const buildChatRoutes = ({
               assistantMessageId ??= crypto.randomUUID();
               const toolParts = buildDynamicToolParts(toolSnapshots);
               const citationParts = buildCitationParts(toolSnapshots);
+              app.log.info(
+                {
+                  requestId: request.id,
+                  threadId: resolvedThreadId,
+                  userId: resolvedUserId,
+                  jobId: job.job_id,
+                  toolSnapshotCount: toolSnapshots.size,
+                  toolPartCount: toolParts.length,
+                  citationPartCount: citationParts.length,
+                  firstCitation:
+                    citationParts.length > 0
+                      ? {
+                          id: citationParts[0].id,
+                          href: citationParts[0].data.href,
+                          title: citationParts[0].data.title,
+                        }
+                      : undefined,
+                },
+                "Prepared assistant persistence payload",
+              );
               await threadRepository.upsertMessage({
                 threadId: resolvedThreadId,
                 message: {

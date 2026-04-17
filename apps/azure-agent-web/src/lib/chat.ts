@@ -363,13 +363,18 @@ const collectToolSnapshotsFromMessages = (
       continue;
     }
 
+    const envelope = message as Record<string, unknown>;
     const messageType =
-      "type" in message && typeof message.type === "string" ? message.type : "";
+      typeof envelope.type === "string" ? envelope.type : "";
+    const payload =
+      "data" in envelope && envelope.data && typeof envelope.data === "object"
+        ? (envelope.data as Record<string, unknown>)
+        : envelope;
 
     if (messageType === "ai") {
       const toolCalls =
-        "tool_calls" in message && Array.isArray(message.tool_calls)
-          ? message.tool_calls
+        "tool_calls" in payload && Array.isArray(payload.tool_calls)
+          ? payload.tool_calls
           : [];
 
       for (const toolCall of toolCalls) {
@@ -418,8 +423,8 @@ const collectToolSnapshotsFromMessages = (
 
     if (messageType === "tool") {
       const toolCallId =
-        "tool_call_id" in message && typeof message.tool_call_id === "string"
-          ? message.tool_call_id
+        "tool_call_id" in payload && typeof payload.tool_call_id === "string"
+          ? payload.tool_call_id
           : undefined;
       if (!toolCallId) {
         continue;
@@ -427,8 +432,8 @@ const collectToolSnapshotsFromMessages = (
 
       const previous = toolSnapshots.get(toolCallId);
       const toolName =
-        ("name" in message && typeof message.name === "string"
-          ? message.name
+        ("name" in payload && typeof payload.name === "string"
+          ? payload.name
           : undefined) ?? previous?.toolName;
 
       if (!toolName) {
@@ -436,11 +441,11 @@ const collectToolSnapshotsFromMessages = (
       }
 
       const status =
-        "status" in message && typeof message.status === "string"
-          ? message.status
+        "status" in payload && typeof payload.status === "string"
+          ? payload.status
           : "success";
       const normalizedContent = normalizeToolContent(
-        "content" in message ? message.content : undefined,
+        "content" in payload ? payload.content : undefined,
       );
 
       toolSnapshots.set(toolCallId, {
