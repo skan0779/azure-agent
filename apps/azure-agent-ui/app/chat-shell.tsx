@@ -22,6 +22,10 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { getThreadMessages } from "@/lib/thread-api";
+import { updateThread } from "@/lib/thread-api";
+import {
+  setOptimisticThreadTitle,
+} from "@/lib/optimistic-thread-titles";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 
@@ -410,8 +414,20 @@ const useLocalChatThreadRuntime = ({
     }
 
     lastOptimisticTitleUpdateKeyRef.current = optimisticUpdateKey;
-    void aui.threadListItem().rename(latestUserText);
-  }, [aui, currentTitle, latestUserMessageId, latestUserText, remoteId]);
+    setOptimisticThreadTitle(remoteId, latestUserText);
+    void updateThread({
+      apiBaseUrl,
+      userId,
+      threadId: remoteId,
+      title: latestUserText,
+      titleSource: "first-user-message",
+    }).catch((error) => {
+      console.warn("Failed to sync optimistic thread title", {
+        threadId: remoteId,
+        error,
+      });
+    });
+  }, [apiBaseUrl, currentTitle, latestUserMessageId, latestUserText, remoteId, userId]);
 
   const runtime = useAISDKRuntime({
     ...chat,

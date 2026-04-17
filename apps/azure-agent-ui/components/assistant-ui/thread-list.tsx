@@ -1,6 +1,6 @@
 "use client";
 
-import { type FC, useEffect, useRef, useState } from "react";
+import { type FC, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   AuiIf,
   ThreadListItemPrimitive,
@@ -25,6 +25,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useSidebar } from "@/components/ui/sidebar";
+import {
+  clearOptimisticThreadTitle,
+  getOptimisticThreadTitle,
+  subscribeOptimisticThreadTitles,
+} from "@/lib/optimistic-thread-titles";
 
 export const ThreadList: FC = () => {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -73,12 +78,19 @@ const ThreadListItem: FC = () => {
   const aui = useAui();
   const { isMobile, setOpenMobile } = useSidebar();
   const title = useAuiState((s) => s.threadListItem.title ?? "New chat");
+  const remoteId = useAuiState((s) => s.threadListItem.remoteId);
   const status = useAuiState((s) => s.threadListItem.status);
   const isMain = useAuiState((s) => s.threads.mainThreadId === s.threadListItem.id);
   const [isEditing, setIsEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(title);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const pendingRenameFocusRef = useRef(false);
+  const optimisticTitle = useSyncExternalStore(
+    subscribeOptimisticThreadTitles,
+    () => getOptimisticThreadTitle(remoteId),
+    () => undefined,
+  );
+  const displayTitle = title === "New chat" && optimisticTitle ? optimisticTitle : title;
+  const [draftTitle, setDraftTitle] = useState(displayTitle);
 
   const canRename = status !== "new";
 
@@ -90,13 +102,25 @@ const ThreadListItem: FC = () => {
     const nextTitle = draftTitle.trim();
     setIsEditing(false);
 
-    if (!canRename || !nextTitle || nextTitle === title) {
-      setDraftTitle(title);
+    if (!canRename || !nextTitle || nextTitle === displayTitle) {
+      setDraftTitle(displayTitle);
       return;
     }
 
     aui.threadListItem().rename(nextTitle);
   };
+
+  useEffect(() => {
+    setDraftTitle(displayTitle);
+  }, [displayTitle]);
+
+  useEffect(() => {
+    if (!remoteId || title === "New chat") {
+      return;
+    }
+
+    clearOptimisticThreadTitle(remoteId);
+  }, [remoteId, title]);
 
   useEffect(() => {
     if (!isEditing) {
@@ -157,7 +181,7 @@ const ThreadListItem: FC = () => {
 
                   if (event.key === "Escape") {
                     event.preventDefault();
-                    setDraftTitle(title);
+                    setDraftTitle(displayTitle);
                     setIsEditing(false);
                   }
                 }}
@@ -165,7 +189,7 @@ const ThreadListItem: FC = () => {
                 aria-label="Rename thread"
               />
             ) : (
-              <ThreadListItemPrimitive.Title fallback="New chat" />
+              <span className="truncate">{displayTitle}</span>
             )}
           </div>
         </ThreadListItemPrimitive.Trigger>
@@ -197,7 +221,7 @@ const ThreadListItem: FC = () => {
                 }
 
                 pendingRenameFocusRef.current = true;
-                setDraftTitle(title);
+                setDraftTitle(displayTitle);
                 setIsEditing(true);
               }}
             >
