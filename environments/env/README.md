@@ -55,8 +55,12 @@ REDIS-STREAM-USERNAME=
 REDIS-STREAM-ACCESS-KEY=
 REDIS-STREAM-PORT=
 
-# Azure Database for Postgres
+# Azure Database for Postgres (Worker)
 POSTGRES-CONN-STRING=
+
+# Azure Database for Postgres (Web)
+POSTGRES-WEB-CONN-STRING=
+
 
 # Tavily Search
 TAVILY-API-KEY=

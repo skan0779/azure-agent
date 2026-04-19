@@ -46,7 +46,6 @@ export const config = {
   corsOrigins,
   agentApiBaseUrl:
     process.env.AGENT_API_BASE_URL ?? "http://127.0.0.1:8080",
-  defaultUserId: process.env.DEFAULT_USER_ID ?? "dev-user",
   keyVaultUrl: process.env.KEY_VAULT_URL?.trim(),
   isCorsOriginAllowed(origin: string | undefined) {
     if (!origin) {

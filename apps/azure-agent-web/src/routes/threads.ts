@@ -1,6 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
 
-import { config } from "../config.js";
 import type { ThreadRepository } from "../lib/thread-repository.js";
 import {
   deleteThreadRoute,
@@ -12,7 +11,7 @@ import {
 const resolveUserId = (headerUserId: unknown) => {
   return typeof headerUserId === "string" && headerUserId.trim()
     ? headerUserId.trim()
-    : config.defaultUserId;
+    : null;
 };
 
 export const buildThreadsRoutes = ({
@@ -31,6 +30,13 @@ export const buildThreadsRoutes = ({
       }
 
       const userId = resolveUserId(request.headers["x-user-id"]);
+      if (!userId) {
+        reply.code(400);
+        return {
+          error: "invalid_request",
+          detail: "Missing X-User-Id header",
+        };
+      }
       const threads = await threadRepository.listThreadsForUser(userId);
       return threads;
     });
@@ -56,6 +62,13 @@ export const buildThreadsRoutes = ({
       }
 
       const userId = resolveUserId(request.headers["x-user-id"]);
+      if (!userId) {
+        reply.code(400);
+        return {
+          error: "invalid_request",
+          detail: "Missing X-User-Id header",
+        };
+      }
       const messages = await threadRepository.getThreadMessages({
         threadId: parsed.data.threadId,
         userId,
@@ -94,6 +107,13 @@ export const buildThreadsRoutes = ({
       }
 
       const userId = resolveUserId(request.headers["x-user-id"]);
+      if (!userId) {
+        reply.code(400);
+        return {
+          error: "invalid_request",
+          detail: "Missing X-User-Id header",
+        };
+      }
       const currentThreads = await threadRepository.listThreadsForUser(userId);
       const existing = currentThreads.find(
         (thread) => thread.id === parsedParams.data.threadId,
@@ -139,6 +159,13 @@ export const buildThreadsRoutes = ({
       }
 
       const userId = resolveUserId(request.headers["x-user-id"]);
+      if (!userId) {
+        reply.code(400);
+        return {
+          error: "invalid_request",
+          detail: "Missing X-User-Id header",
+        };
+      }
       await threadRepository.deleteThread({
         threadId: parsed.data.threadId,
         userId,

@@ -37,6 +37,17 @@ const cancelBodySchema = z.object({
   userId: z.string().min(1).optional(),
 });
 
+const resolveUserId = ({
+  bodyUserId,
+  headerUserId,
+}: {
+  bodyUserId?: string;
+  headerUserId?: string;
+}) => {
+  const resolved = bodyUserId?.trim() || headerUserId?.trim();
+  return resolved || null;
+};
+
 const COMPLETED_CANCEL_TTL_MS = 30_000;
 const inFlightJobCancels = new Map<string, Promise<void>>();
 const completedJobCancels = new Map<string, number>();
@@ -130,10 +141,17 @@ export const buildChatRoutes = ({
       typeof request.headers["x-user-id"] === "string"
         ? request.headers["x-user-id"]
         : undefined;
-    const resolvedUserId =
-      parsed.data.userId?.trim() ||
-      headerUserId?.trim() ||
-      config.defaultUserId;
+    const resolvedUserId = resolveUserId({
+      bodyUserId: parsed.data.userId,
+      headerUserId,
+    });
+    if (!resolvedUserId) {
+      reply.code(400);
+      return {
+        error: "invalid_request",
+        detail: "Missing userId or X-User-Id header",
+      };
+    }
 
     app.log.info(
       {
@@ -186,8 +204,17 @@ export const buildChatRoutes = ({
       typeof request.headers["x-user-id"] === "string"
         ? request.headers["x-user-id"]
         : undefined;
-    const resolvedUserId =
-      userId?.trim() || headerUserId?.trim() || config.defaultUserId;
+    const resolvedUserId = resolveUserId({
+      bodyUserId: userId,
+      headerUserId,
+    });
+    if (!resolvedUserId) {
+      reply.code(400);
+      return {
+        error: "invalid_request",
+        detail: "Missing userId or X-User-Id header",
+      };
+    }
     const resolvedThreadId = resolveThreadId(threadId, id);
     const abortController = new AbortController();
     let activeJob: AgentJobCreateResponse | null = null;
