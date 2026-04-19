@@ -24,14 +24,12 @@ import {
   CopyIcon,
   ExternalLinkIcon,
   FileTextIcon,
-  ImageIcon,
   LightbulbIcon,
   LoaderIcon,
   PencilIcon,
   PenLineIcon,
   PlusIcon,
   RotateCcwIcon,
-  SparklesIcon,
   SquareIcon,
   ThumbsDownIcon,
   ThumbsUpIcon,
@@ -45,7 +43,6 @@ import {
   CitationList,
   type SerializableCitation,
 } from "@/components/tool-ui/citation/index";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 const toSerializableCitation = (part: unknown): SerializableCitation | null => {
   if (!part || typeof part !== "object") {

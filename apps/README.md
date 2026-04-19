@@ -72,7 +72,7 @@ New repository secret:
 New repository variables:
 `NEXT_PUBLIC_AGENT_WEB_URL`: Azure Container App Application Url (azure-agent-web)
 
-### 6. Deploy UI iva Github Actions
+### 6. Deploy UI via Github Actions
 > deploy `azure-agent-ui` via github workflow
 
 ```bash
