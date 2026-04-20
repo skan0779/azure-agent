@@ -9,7 +9,7 @@ from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import SearchIndex
 
 # Load ENV
-ENV_PATH = Path(__file__).resolve().parents[2] / "environments/env/.env.dev"
+ENV_PATH = Path(__file__).resolve().parents[2] / "environments/env/.env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 # Set ENV

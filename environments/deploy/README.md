@@ -30,11 +30,6 @@ docker buildx build --platform linux/amd64 \
   -f environments/deploy/Dockerfile \
   -t azure-agent:local \
   --load .
-
-# Run (Optional)
-docker run --rm -p 8080:8080 -e PORT=8080 \
-  --env-file environments/env/.env.dev \
-  azure-agent:local
 ```
 
 ---

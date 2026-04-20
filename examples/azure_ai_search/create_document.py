@@ -9,7 +9,7 @@ from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 
 # Load ENV
-ENV_PATH = Path(__file__).resolve().parents[2] / "environments/env/.env.dev"
+ENV_PATH = Path(__file__).resolve().parents[2] / "environments/env/.env"
 load_dotenv(dotenv_path=ENV_PATH)
 
 # Load Data

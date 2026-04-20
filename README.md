@@ -22,7 +22,7 @@
 <br>
 
 ## Quickstart
-> Required and optional steps to deploy the services.
+> Required and optional steps to start the service.
 
 ### 1. Provision Azure Resources
 
@@ -46,7 +46,9 @@
 | Log Analytics Workspace | - |
 
 ### 2. Create an Azure AI Search index
-- Create the index schema
+> This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In practice, adapt your own data. For more details, see [`README.md`](./examples/azure_ai_search/README.md).
+
+Create the index schema
 ```bash
 uv run python examples/azure_ai_search/create_index.py
 ```
@@ -54,40 +56,153 @@ uv run python examples/azure_ai_search/create_index.py
 ```bash
 uv run python examples/azure_ai_search/create_document.py
 ```
-- [`README.md`](./examples/azure_ai_search/README.md)
 
 ### 3. Create an [Tavily](https://www.tavily.com/) account (optional)
-- Create a Tavily API key
+> Create your Tavily API key and set in key vault secrets 
 
 ### 4. Upload prompt files to Azure Blob Storage (optional)
-- Upload prompt files such as `example.yaml`
-- Blob Storage is the primary source for prompts (fallback to the local prompt files)
-- [`README.md`](./src/azure_agent/prompts/README.md)
+> This repository provides an example system prompt, [`example.yaml`](./src/azure_agent/prompts/example.yaml). If no prompt files are found in Azure Blob Storage, the application uses the local `example.yaml` file as a fallback. For production use, replace it with your own system prompt. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
+
+Upload prompt file to blob
+```bash
+az storage blob upload \
+  --connection-string "<your-blob-connection-string>" \
+  --container-name "<your-blob-container-name>" \
+  --file src/azure_agent/prompts/example.yaml \
+  --name example.yaml \
+  --overwrite
+```
 
 ### 5. Configure an Azure Key Vault Secrets
-- Add secret values from [`.env.keyvault`](./environments/env/.env.keyvault)
-- [`README.md`](./environments/env/README.md)
+> Add secret values in [`.env.keyvault`](./environments/env/.env.keyvault). For more details, see [`README.md`](./environments/env/README.md)
 
-### 6. Build and Push the Docker Image
-- Build the Docker image
-- Run `az login`
-- Push the Docker image to `Azure Container Registry`
-- [`README.md`](./environments/deploy/README.md)
+Azure Login:
+```bash
+az login
+```
 
-### 7. Deploy an Azure Container Apps
-- Deploy `azure-agent-api` with ingress enabled on port `8080`
-- Deploy `azure-agent-worker` with ingress disabled (set command override: `sh` & `-lc`, `uv run azure-agent-worker`)
+- Set Key Vault Secrets
+```bash
+az keyvault secret set \
+  --vault-name "<your-key-vault-name>" \
+  --name "<secret-name>" \
+  --value "<secret-value>"
+```
 
-### 8. Configure an Azure Container Apps
-- Enable a Managed Identity
-- Grant permissions to Managed Identity: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`
-- Set environment variables from [`.env.example`](./environments/env/.env.example)
-- [`README.md`](./src/azure_agent/api/README.md)
+### 6. Build and Push Docker Image to Azure Container Registry
+> For more details, see [`README.md`](./environments/deploy/README.md) and [`README.md`](./apps/README.md).
 
-### 9. Check Swagger & Status
-- `https://<application-url>/agent/api/ping`
-- `https://<application-url>/agent/api/health`
-- `https://<application-url>/agent/swagger`
+- Azure Login:
+```bash
+az login
+az acr login -n "<your-acr-name>"
+```
+
+Build and push `azure-agent-api`, `azure-agent-worker` docker image:
+```bash
+docker buildx build \
+  --platform linux/amd64 \
+  --provenance=false \
+  -f environments/deploy/Dockerfile \
+  -t "<your-acr-name>".azurecr.io/azure-agent:local \
+  --push .
+```
+
+Build and push `azure-agent-web` docker image:
+```bash
+docker buildx build \
+  --platform linux/amd64 \
+  --provenance=false \
+  -f apps/azure-agent-web/Dockerfile \
+  -t "<your-acr-name>".azurecr.io/azure-agent-web:local \
+  --push .
+```
+
+### 7. Deploy and Configure an Azure Container Apps
+> For more details, see [`README.md`](./environments/env/README.md).
+
+Deploy `azure-agent-api`:
+- Ingress : ✅
+- Target port : 8080
+- Security > Identity > System assigned: ✅
+- Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+- Application > Containers > Environment variables:
+```env
+KEY_VAULT_URL=https://<your-key-vault-name>.vault.azure.net/
+SSE_MAX_CONNECTION_SECONDS=600 # 10 minutes
+JOB_TTL_SECONDS=86400 # 1 day
+EVENT_TTL_SECONDS=86400 # 1 day
+IDEMPOTENCY_TTL_SECONDS=86400 # 1 day
+SESSION_TTL_SECONDS=3600 # 1 hour
+SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
+SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
+```
+
+Deploy `azure-agent-worker`:
+- Ingress : ❎
+- Command override: `sh`
+- Arguments override: `-lc, uv run azure-agent-worker`
+- Security > Identity > System assigned: ✅
+- Azure role assignments: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`
+- Application > Containers > Environment variables:
+```env
+KEY_VAULT_URL=<your-key-vault-url>
+JOB_TTL_SECONDS=86400 # 1 day
+EVENT_TTL_SECONDS=86400 # 1 day
+IDEMPOTENCY_TTL_SECONDS=86400 # 1 day
+SESSION_TTL_SECONDS=3600 # 1 hour
+SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
+SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
+WORKER_HEARTBEAT_INTERVAL_SECONDS=15 # 15 seconds
+WORKER_PENDING_CLAIM_IDLE_MS=300000 # 5 minutes
+WORKER_PENDING_CLAIM_COUNT=2 # 2 entries per reclaim cycle
+WORKER_READ_BLOCK_MS=10000 # 10 seconds
+WORKER_READ_COUNT=1 # 1 entry per read
+```
+
+Deploy `azure-agent-web`:
+- Ingress : ✅
+- Target port : 3001
+- Security > Identity > System assigned: ✅
+- Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+- Application > Containers > Environment variables:
+```env
+KEY_VAULT_URL=<your-key-vault-url>
+AGENT_API_BASE_URL=<your-azure-agent-api-url>
+CORS_ORIGINS=https://<your-static-web-app-domain>
+HOST=0.0.0.0
+PORT=3001
+```
+
+### 8. Deploy and Configure an Azure Static Web Apps
+> For more details, see [`README.md`](./apps/README.md).
+
+Deploy `azure-agent-ui`:
+- Source: Other
+- Deployment authorization policy: Deployment Token
+
+Setting Github Actions (Github Repository > Settings > Secrets and variables > Actions):
+- New repository secret: `AZURE_STATIC_WEB_APPS_API_TOKEN`: `Azure Static Web App Deployment Token`
+- New repository variables: `NEXT_PUBLIC_AGENT_WEB_URL`: `azure-agent-web Application Url`
+
+Deploy `azure-agent-ui` via github workflow:
+```bash
+git push origin main
+```
+
+### 9. Check Service Status (optional)
+> For more details, see [`README.md`](./src/azure_agent/api/README.md).
+
+Check `azure-agent-api` status:
+- `https://<azure-agent-api-url>/agent/api/ping`
+- `https://<azure-agent-api-url>/agent/api/health`
+- `https://<azure-agent-api-url>/agent/swagger`
+
+Check `azure-agent-web` status:
+- `https://<azure-agent-web-url>/health`
+
+Check `azure-agent-ui` status:
+- `https://<azure-agent-ui-url>`
 
 ---
 
@@ -112,8 +227,7 @@ uv run python examples/azure_ai_search/create_document.py
 | Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | Azure Static Web Apps  |
-
-<!-- | Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - | -->
+| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - |
 
 ---
 
