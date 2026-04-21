@@ -236,7 +236,7 @@ Check `azure-agent-ui` status:
 <p align="center">
   <img src="./docs/diagram/Azure-Resource-Architecture.png"
        alt="azure resource achitecture"
-       style="width: 80%; height: auto;">
+       style="width: 100%; height: auto;">
 </p>
 
 
