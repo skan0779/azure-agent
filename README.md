@@ -12,11 +12,16 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2563EB.svg" alt="License"></a>
   <a href="https://github.com/skan0779/azure-agent/stargazers" target="_blank"><img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat&color=1D4ED8" alt="GitHub Stars"></a>
   <a href="https://www.python.org/" target="_blank"><img src="https://img.shields.io/badge/Python-306998?logo=python&logoColor=white" alt="Python"></a>
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
+  <img src="https://img.shields.io/badge/React-149ECA?logo=react&logoColor=white" alt="React">
+  <img src="https://img.shields.io/badge/Next.js-111111?logo=nextdotjs&logoColor=white" alt="Next.js">
   <img src="https://img.shields.io/badge/LangGraph-1F2937?logo=langchain&logoColor=white" alt="LangGraph">
   <img src="https://img.shields.io/badge/Redis-B91C1C?logo=redis&logoColor=white" alt="Redis">
   <img src="https://img.shields.io/badge/PostgreSQL-1D4ED8?logo=postgresql&logoColor=white" alt="PostgreSQL">
   <img src="https://img.shields.io/badge/FastAPI-0F766E?logo=fastapi&logoColor=white" alt="FastAPI">
+  <img src="https://img.shields.io/badge/Fastify-000000?logo=fastify&logoColor=white" alt="Fastify">
   <img src="https://img.shields.io/badge/Docker-2563EB?logo=docker&logoColor=white" alt="Docker">
+  <img src="https://img.shields.io/badge/PNPM-F69220?logo=pnpm&logoColor=white" alt="pnpm">
   <img src="https://img.shields.io/badge/uv-7C3AED?logo=uv&logoColor=white" alt="uv">
 </p>
 <br>
@@ -48,12 +53,10 @@
 ### 2. Create an Azure AI Search index
 > This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In practice, adapt your own data. For more details, see [`README.md`](./examples/azure_ai_search/README.md).
 
-Create the index schema
+Create index schema and Upload index documents
 ```bash
 uv run python examples/azure_ai_search/create_index.py
-```
-- Upload index documents
-```bash
+
 uv run python examples/azure_ai_search/create_document.py
 ```
 
@@ -74,15 +77,13 @@ az storage blob upload \
 ```
 
 ### 5. Configure an Azure Key Vault Secrets
-> Add secret values in [`.env.keyvault`](./environments/env/.env.keyvault). For more details, see [`README.md`](./environments/env/README.md)
+> Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. For more details, see [`README.md`](./environments/env/README.md).
 
-Azure Login:
+
+Set the Key Vault Secrets:
 ```bash
 az login
-```
 
-- Set Key Vault Secrets
-```bash
 az keyvault secret set \
   --vault-name "<your-key-vault-name>" \
   --name "<secret-name>" \
@@ -92,14 +93,12 @@ az keyvault secret set \
 ### 6. Build and Push Docker Image to Azure Container Registry
 > For more details, see [`README.md`](./environments/deploy/README.md) and [`README.md`](./apps/README.md).
 
-- Azure Login:
-```bash
-az login
-az acr login -n "<your-acr-name>"
-```
-
 Build and push `azure-agent-api`, `azure-agent-worker` docker image:
 ```bash
+az login
+
+az acr login -n "<your-acr-name>"
+
 docker buildx build \
   --platform linux/amd64 \
   --provenance=false \
@@ -128,7 +127,7 @@ Deploy `azure-agent-api`:
 - Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
 - Application > Containers > Environment variables:
 ```env
-KEY_VAULT_URL=https://<your-key-vault-name>.vault.azure.net/
+KEY_VAULT_URL=<your-key-vault-url>
 SSE_MAX_CONNECTION_SECONDS=600 # 10 minutes
 JOB_TTL_SECONDS=86400 # 1 day
 EVENT_TTL_SECONDS=86400 # 1 day
@@ -182,8 +181,8 @@ Deploy `azure-agent-ui`:
 - Deployment authorization policy: Deployment Token
 
 Setting Github Actions (Github Repository > Settings > Secrets and variables > Actions):
-- New repository secret: `AZURE_STATIC_WEB_APPS_API_TOKEN`: `Azure Static Web App Deployment Token`
-- New repository variables: `NEXT_PUBLIC_AGENT_WEB_URL`: `azure-agent-web Application Url`
+- New repository secret: `AZURE_STATIC_WEB_APPS_API_TOKEN`: `azure-agent-ui` Deployment Token
+- New repository variables: `NEXT_PUBLIC_AGENT_WEB_URL`: `azure-agent-web` Application Url
 
 Deploy `azure-agent-ui` via github workflow:
 ```bash
@@ -226,15 +225,20 @@ Check `azure-agent-ui` status:
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
 | Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
-| UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui) | Azure Static Web Apps  |
-| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - |
+| UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
+<!-- | Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - | -->
 
 ---
 
 ## Agent Architecture
 > 
 
-not yet
+<p align="center">
+  <img src="./docs/diagram/Azure-Resource-Architecture.png"
+       alt="azure resource achitecture"
+       style="width: 80%; height: auto;">
+</p>
+
 
 ---
 

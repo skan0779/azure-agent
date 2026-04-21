@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "azure-agent"
 version = "0.1.0"
 requires-python = ">=3.12"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [
   { name = "JUNG SEOK HWAN" },
 ]
 classifiers = [
-  "License :: OSI Approved :: MIT License",
+  "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
     "langchain-openai",
