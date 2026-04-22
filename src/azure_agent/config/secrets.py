@@ -37,8 +37,6 @@ class AppSecrets:
     REDIS_DB: str
     # Azure Database for PostgreSQL
     POSTGRES_CONN_STRING: str
-    # Tavily
-    TAVILY_API_KEY: str
     # Tiktoken
     TIKTOKEN_ENCODER: str
     # Azure AI Content Safety

@@ -252,12 +252,17 @@ type CitationDataPart = {
   };
 };
 
+type CitationRecord = CitationDataPart["data"];
+
 type ToolSnapshot = {
   toolName: string;
   toolCallId: string;
   input?: unknown;
   output?: unknown;
   errorText?: string;
+  title?: string;
+  providerExecuted?: boolean;
+  citations?: CitationRecord[];
   state:
     | "input-available"
     | "output-available"
@@ -313,6 +318,14 @@ const getResultsFromToolOutput = (output: unknown): unknown[] => {
   return [];
 };
 
+const getContentPartsFromPayload = (payload: Record<string, unknown>): unknown[] => {
+  if ("content" in payload && Array.isArray(payload.content)) {
+    return payload.content;
+  }
+
+  return [];
+};
+
 const normalizeToolContent = (content: unknown) => {
   if (typeof content === "string") {
     const trimmed = content.trim();
@@ -335,6 +348,133 @@ const normalizeToolContent = (content: unknown) => {
   }
 
   return String(content ?? "");
+};
+
+const createCitationRecord = ({
+  href,
+  title,
+  snippet,
+}: {
+  href: string;
+  title: string;
+  snippet?: string;
+}): CitationRecord => {
+  const domain = getHostname(href);
+
+  return {
+    citationId: "",
+    href,
+    title,
+    snippet,
+    domain,
+    favicon: getFaviconUrl(domain),
+    citationType: "article",
+  };
+};
+
+const getCitationRecordKey = (citation: CitationRecord): string =>
+  `${citation.href}::${citation.title}`;
+
+const dedupeCitationRecords = (citations: CitationRecord[]): CitationRecord[] => {
+  const deduped = new Map<string, CitationRecord>();
+
+  for (const citation of citations) {
+    deduped.set(getCitationRecordKey(citation), citation);
+  }
+
+  return Array.from(deduped.values());
+};
+
+const areCitationRecordListsEqual = (
+  left: CitationRecord[] = [],
+  right: CitationRecord[] = [],
+): boolean => {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  return left.every((citation, index) => {
+    const other = right[index];
+    return (
+      other &&
+      citation.href === other.href &&
+      citation.title === other.title &&
+      citation.snippet === other.snippet
+    );
+  });
+};
+
+const getCitationRecordsFromAnnotations = (annotations: unknown[]): CitationRecord[] => {
+  const citations: CitationRecord[] = [];
+
+  for (const annotation of annotations) {
+    if (!annotation || typeof annotation !== "object") {
+      continue;
+    }
+
+    const href =
+      "url" in annotation && typeof annotation.url === "string"
+        ? annotation.url
+        : "";
+    const title =
+      "title" in annotation && typeof annotation.title === "string"
+        ? annotation.title
+        : "";
+
+    if (!href || !title) {
+      continue;
+    }
+
+    citations.push(
+      createCitationRecord({
+        href,
+        title,
+      }),
+    );
+  }
+
+  return dedupeCitationRecords(citations);
+};
+
+const buildWebSearchOutput = (
+  input: unknown,
+  citations: CitationRecord[],
+): Record<string, unknown> => {
+  const query =
+    input && typeof input === "object" && "query" in input && typeof input.query === "string"
+      ? input.query
+      : undefined;
+  const queries =
+    input && typeof input === "object" && "queries" in input && Array.isArray(input.queries)
+      ? input.queries
+      : undefined;
+
+  return {
+    query,
+    queries,
+    sources: citations.map((citation) => ({
+      url: citation.href,
+      title: citation.title,
+      snippet: citation.snippet,
+      domain: citation.domain,
+    })),
+  };
+};
+
+const findLatestProviderToolSnapshot = (
+  toolSnapshots: Map<string, ToolSnapshot>,
+  toolName: string,
+): ToolSnapshot | undefined => {
+  const snapshots = Array.from(toolSnapshots.values());
+
+  for (let index = snapshots.length - 1; index >= 0; index -= 1) {
+    const snapshot = snapshots[index];
+    if (snapshot.toolName === toolName) {
+      return snapshot;
+    }
+  }
+
+  return undefined;
 };
 
 const getToolMessagesFromUpdateNode = (value: unknown): unknown[] => {
@@ -370,6 +510,114 @@ const collectToolSnapshotsFromMessages = (
       "data" in envelope && envelope.data && typeof envelope.data === "object"
         ? (envelope.data as Record<string, unknown>)
         : envelope;
+
+    if (messageType === "AIMessageChunk" || messageType === "ai") {
+      const contentParts = getContentPartsFromPayload(payload);
+
+      for (const part of contentParts) {
+        if (!part || typeof part !== "object") {
+          continue;
+        }
+
+        if (!("type" in part) || part.type !== "web_search_call") {
+          continue;
+        }
+
+        const toolCallId =
+          "id" in part && typeof part.id === "string" ? part.id : undefined;
+        if (!toolCallId) {
+          continue;
+        }
+
+        const action =
+          "action" in part && part.action && typeof part.action === "object"
+            ? (part.action as Record<string, unknown>)
+            : {};
+        const input = {
+          query:
+            typeof action.query === "string"
+              ? action.query
+              : undefined,
+          queries: Array.isArray(action.queries) ? action.queries : undefined,
+          type: typeof action.type === "string" ? action.type : undefined,
+        };
+        const previous = toolSnapshots.get(toolCallId);
+
+        toolSnapshots.set(toolCallId, {
+          toolCallId,
+          toolName: "web_search",
+          title: "Web search",
+          providerExecuted: true,
+          input,
+          output: previous?.output,
+          errorText: previous?.errorText,
+          citations: previous?.citations,
+          state:
+            previous?.state === "output-available" ||
+            previous?.state === "output-error"
+              ? previous.state
+              : "input-available",
+        });
+
+        if (!previous) {
+          chunks.push({
+            type: "tool-input-available",
+            toolCallId,
+            toolName: "web_search",
+            input,
+            dynamic: true,
+          });
+        }
+      }
+
+      const annotationCitations = dedupeCitationRecords(
+        contentParts.flatMap((part) => {
+          if (!part || typeof part !== "object") {
+            return [];
+          }
+
+          if (!("type" in part) || part.type !== "text") {
+            return [];
+          }
+
+          const annotations =
+            "annotations" in part && Array.isArray(part.annotations)
+              ? part.annotations
+              : [];
+
+          return getCitationRecordsFromAnnotations(annotations);
+        }),
+      );
+
+      if (annotationCitations.length > 0) {
+        const snapshot = findLatestProviderToolSnapshot(toolSnapshots, "web_search");
+        if (snapshot) {
+          const mergedCitations = dedupeCitationRecords([
+            ...(snapshot.citations ?? []),
+            ...annotationCitations,
+          ]);
+
+          if (
+            snapshot.state !== "output-available" ||
+            !areCitationRecordListsEqual(snapshot.citations, mergedCitations)
+          ) {
+            snapshot.citations = mergedCitations;
+            snapshot.output = buildWebSearchOutput(snapshot.input, mergedCitations);
+            snapshot.state = "output-available";
+            snapshot.providerExecuted = true;
+            snapshot.title = "Web search";
+            toolSnapshots.set(snapshot.toolCallId, snapshot);
+
+            chunks.push({
+              type: "tool-output-available",
+              toolCallId: snapshot.toolCallId,
+              output: snapshot.output,
+              dynamic: true,
+            });
+          }
+        }
+      }
+    }
 
     if (messageType === "ai") {
       const toolCalls =
@@ -521,6 +769,8 @@ export const buildDynamicToolParts = (
         type: "dynamic-tool",
         toolName: snapshot.toolName,
         toolCallId: snapshot.toolCallId,
+        title: snapshot.title,
+        providerExecuted: snapshot.providerExecuted,
         state: "output-available",
         input: snapshot.input,
         output: snapshot.output,
@@ -532,6 +782,8 @@ export const buildDynamicToolParts = (
         type: "dynamic-tool",
         toolName: snapshot.toolName,
         toolCallId: snapshot.toolCallId,
+        title: snapshot.title,
+        providerExecuted: snapshot.providerExecuted,
         state: "output-error",
         input: snapshot.input,
         errorText: snapshot.errorText ?? "Tool execution failed",
@@ -542,6 +794,8 @@ export const buildDynamicToolParts = (
       type: "dynamic-tool",
       toolName: snapshot.toolName,
       toolCallId: snapshot.toolCallId,
+      title: snapshot.title,
+      providerExecuted: snapshot.providerExecuted,
       state: "input-available",
       input: snapshot.input,
     };
@@ -558,44 +812,54 @@ export const buildCitationParts = (
       continue;
     }
 
-    const results = getResultsFromToolOutput(snapshot.output);
+    const records =
+      snapshot.citations && snapshot.citations.length > 0
+        ? snapshot.citations
+        : getResultsFromToolOutput(snapshot.output)
+            .map((result) => {
+              if (!result || typeof result !== "object") {
+                return undefined;
+              }
 
-    for (let index = 0; index < results.length; index += 1) {
-      const result = results[index];
-      if (!result || typeof result !== "object") {
-        continue;
-      }
+              const href =
+                "url" in result && typeof result.url === "string" ? result.url : "";
+              const title =
+                "title" in result && typeof result.title === "string"
+                  ? result.title
+                  : "";
 
-      const href =
-        "url" in result && typeof result.url === "string" ? result.url : "";
-      const title =
-        "title" in result && typeof result.title === "string"
-          ? result.title
-          : "";
+              if (!href || !title) {
+                return undefined;
+              }
 
-      if (!href || !title) {
-        continue;
-      }
+              const snippet =
+                "content" in result && typeof result.content === "string"
+                  ? result.content
+                  : "raw_content" in result && typeof result.raw_content === "string"
+                    ? result.raw_content
+                    : undefined;
 
-      const domain = getHostname(href);
-      const snippet =
-        "content" in result && typeof result.content === "string"
-          ? result.content
-          : "raw_content" in result && typeof result.raw_content === "string"
-            ? result.raw_content
-            : undefined;
+              return createCitationRecord({
+                href,
+                title,
+                snippet,
+              });
+            })
+            .filter((citation): citation is CitationRecord => Boolean(citation));
 
+    for (let index = 0; index < records.length; index += 1) {
+      const record = records[index];
       citations.push({
         type: "data-citation",
         id: `${snapshot.toolCallId}:${index}`,
         data: {
           citationId: `${snapshot.toolCallId}:${index}`,
-          href,
-          title,
-          snippet,
-          domain,
-          favicon: getFaviconUrl(domain),
-          citationType: "article",
+          href: record.href,
+          title: record.title,
+          snippet: record.snippet,
+          domain: record.domain,
+          favicon: record.favicon,
+          citationType: record.citationType,
         },
       });
     }

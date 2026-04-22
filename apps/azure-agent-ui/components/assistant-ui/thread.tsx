@@ -403,9 +403,7 @@ const AssistantMessage: FC = () => {
         <div className="flex flex-wrap items-center gap-2 pt-2">
           <ActionBarPrimitive.Root
             hideWhenRunning
-            autohide="not-last"
-            autohideFloat="single-branch"
-            className="flex items-center gap-1 rounded-lg data-floating:absolute data-floating:p-1"
+            className="flex items-center gap-1 rounded-lg"
           >
             <ActionBarPrimitive.FeedbackPositive asChild>
               <TooltipIconButton tooltip="Good response" className="text-[#b4b4b4]">

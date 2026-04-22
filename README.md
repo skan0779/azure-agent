@@ -60,10 +60,7 @@ uv run python examples/azure_ai_search/create_index.py
 uv run python examples/azure_ai_search/create_document.py
 ```
 
-### 3. Create an [Tavily](https://www.tavily.com/) account (optional)
-> Create your Tavily API key and set in key vault secrets 
-
-### 4. Upload prompt files to Azure Blob Storage (optional)
+### 3. Upload prompt files to Azure Blob Storage (optional)
 > This repository provides an example system prompt, [`example.yaml`](./src/azure_agent/prompts/example.yaml). If no prompt files are found in Azure Blob Storage, the application uses the local `example.yaml` file as a fallback. For production use, replace it with your own system prompt. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
 
 Upload prompt file to blob
@@ -76,7 +73,7 @@ az storage blob upload \
   --overwrite
 ```
 
-### 5. Configure an Azure Key Vault Secrets
+### 4. Configure an Azure Key Vault Secrets
 > Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. For more details, see [`README.md`](./environments/env/README.md).
 
 
@@ -90,7 +87,7 @@ az keyvault secret set \
   --value "<secret-value>"
 ```
 
-### 6. Build and Push Docker Image to Azure Container Registry
+### 5. Build and Push Docker Image to Azure Container Registry
 > For more details, see [`README.md`](./environments/deploy/README.md) and [`README.md`](./apps/README.md).
 
 Build and push `azure-agent-api`, `azure-agent-worker` docker image:
@@ -117,7 +114,7 @@ docker buildx build \
   --push .
 ```
 
-### 7. Deploy and Configure an Azure Container Apps
+### 6. Deploy and Configure an Azure Container Apps
 > For more details, see [`README.md`](./environments/env/README.md).
 
 Deploy `azure-agent-api`:
@@ -173,7 +170,7 @@ HOST=0.0.0.0
 PORT=3001
 ```
 
-### 8. Deploy and Configure an Azure Static Web Apps
+### 7. Deploy and Configure an Azure Static Web Apps
 > For more details, see [`README.md`](./apps/README.md).
 
 Deploy `azure-agent-ui`:
@@ -189,7 +186,7 @@ Deploy `azure-agent-ui` via github workflow:
 git push origin main
 ```
 
-### 9. Check Service Status (optional)
+### 8. Check Service Status (optional)
 > For more details, see [`README.md`](./src/azure_agent/api/README.md).
 
 Check `azure-agent-api` status:
@@ -214,7 +211,7 @@ Check `azure-agent-ui` status:
 | Session Management | [Session Manager(Custom)](./src/azure_agent/session/README.md) | Azure Managed Redis (OSS) |
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
-| Web Search | [TavilySearch](https://reference.langchain.com/python/langchain-tavily/tavily_search/TavilySearch) | - |
+| Web Search | [Web Search (Grounding with Bing Search)](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | - |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [Langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
@@ -230,7 +227,7 @@ Check `azure-agent-ui` status:
 
 ---
 
-## Agent Architecture
+## Azure Resouece Architecture
 > 
 
 <p align="center">

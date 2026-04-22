@@ -61,10 +61,6 @@ POSTGRES-CONN-STRING=
 # Azure Database for Postgres (Web)
 POSTGRES-WEB-CONN-STRING=
 
-
-# Tavily Search
-TAVILY-API-KEY=
-
 # Tokenizer
 TIKTOKEN-ENCODER=
 ```
