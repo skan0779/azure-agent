@@ -15,5 +15,5 @@ def create_azure_ai_search_tool(
     return create_retriever_tool(
         retriever=retriever,
         name="azure_ai_search",
-        description="Retrieve relevant Microsoft Learn and official Azure documents.",
+        description="Retrieve relevant Microsoft Learn and Azure documents.",
     )

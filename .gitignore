@@ -33,7 +33,6 @@ __pycache__/
 *$py.class
 **/.DS_Store
 *.pem
-AGENTS.md
 
 # C extensions
 *.so

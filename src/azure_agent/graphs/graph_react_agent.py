@@ -12,8 +12,9 @@ from fastapi.encoders import jsonable_encoder
 
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, message_to_dict
+from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.runnables import RunnableConfig
-from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings
+from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     ModelRetryMiddleware,
@@ -26,8 +27,6 @@ from langchain.agents.middleware import (
 
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
-
-from langchain_tavily import TavilySearch
 
 from langchain_community.vectorstores.azuresearch import AzureSearch
 
@@ -182,8 +181,6 @@ class LangGraphProcess:
         assert self.secret_client is not None
         self.secrets = await load_app_secrets(self.secret_client)
 
-        os.environ["TAVILY_API_KEY"] = self.secrets.TAVILY_API_KEY
-
     def _load_instance(self) -> None:
         # Load Secrets
         if self.secrets is None:
@@ -197,15 +194,13 @@ class LangGraphProcess:
         )
 
         # Initialize Azure OpenAI Models
-        self.main_model = AzureChatOpenAI(
-            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
-            api_key=secrets.AZURE_OPENAI_API_KEY,
-            api_version=secrets.AZURE_OPENAI_API_VERSION,
-            azure_deployment=secrets.AZURE_OPENAI_MAIN_MODEL,
-            tiktoken_model_name=secrets.AZURE_OPENAI_MAIN_MODEL,
+        self.main_model = ChatOpenAI(
             model=secrets.AZURE_OPENAI_MAIN_MODEL,
+            base_url=f"{secrets.AZURE_OPENAI_ENDPOINT.rstrip('/')}/openai/v1/",
+            api_key=secrets.AZURE_OPENAI_API_KEY,
+            use_responses_api=True,
             stream_usage=True,
-            request_timeout=int(secrets.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
+            timeout=int(secrets.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
         )
         self.small_model = AzureChatOpenAI(
             azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
@@ -477,13 +472,16 @@ class LangGraphProcess:
             azure_ai_search=self.azure_search,
             top_k=int(secrets.AZURE_AI_SEARCH_TOP_K),
         )
-
-        # Create Tavily Search Tool
-        tavily_search = TavilySearch(
-            max_results=3, 
-            topic="general"
-        )
         
+        # Create Web Search Tool (Grounding with bing search)
+        web_search = {
+            "type": "web_search",
+            "user_location": {
+                "type": "approximate",
+                "country": "KR",
+            },
+        }
+
         # Create Main Agent
         main_agent = create_agent(
             model=self.main_model,
@@ -491,14 +489,10 @@ class LangGraphProcess:
                 manage_memory,          # LangMem
                 search_memory,          # LangMem
                 azure_ai_search,        # RAG
-                tavily_search,          # Web Search
+                web_search,             # Web Search
             ],
             system_prompt=self.prompt_cache["example.yaml"],
             middleware=[
-                # Custom Middleware
-                event_stream_before_agent,
-                event_stream_before_model,
-
                 # Model Middleware
                 ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
 
@@ -510,7 +504,7 @@ class LangGraphProcess:
                     model=self.small_model,
                     trigger=[("tokens", 20000)],
                     keep=("messages", 20),
-                    token_counter=self.small_model.get_num_tokens_from_messages,
+                    token_counter=count_tokens_approximately,
                 ),
 
                 # PII Middleware

@@ -1,4 +1,4 @@
-import asyncio, os, yaml, logging, inspect, json
+import asyncio, os, yaml, logging, inspect
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 
@@ -10,40 +10,29 @@ from redis.asyncio import Redis
 
 from fastapi.encoders import jsonable_encoder
 
-from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, message_to_dict
-from langchain_core.messages.utils import count_tokens_approximately
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI
+from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
-    ModelRetryMiddleware,
-    ModelFallbackMiddleware,
     ToolCallLimitMiddleware,
-    ToolRetryMiddleware,
-    SummarizationMiddleware,
     PIIMiddleware,
 )
-
 from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
-
-from langchain_community.vectorstores.azuresearch import AzureSearch
-
-from langmem import create_manage_memory_tool, create_search_memory_tool
+from deepagents import create_deep_agent, CompiledSubAgent
+from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
-from azure_agent.middlewares.stream import (
-    event_stream_before_agent,
-    event_stream_before_model,
-)
+from azure_agent.graphs.schema import AgentContext
+from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
+from azure_agent.tools.sessions_python_repl import create_sessions_python_repl_tool
 from azure_agent.middlewares.azure_ai_content_safety import (
     azure_content_moderation_middleware,
     azure_prompt_shield_middleware,
 )
-from azure_agent.graphs.schema import AgentState, UserProfile
-from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +154,11 @@ class LangGraphProcess:
             if inspect.isawaitable(maybe):
                 await maybe
 
-        await self._load_prompts(["example.yaml"])
+        await self._load_prompts([
+            "main_agent.yaml",
+            "analyst_agent.yaml",
+            # "coding_agent.yaml",
+        ])
 
         # Build Graph
         self.graph = self._build_graph(
@@ -439,33 +432,18 @@ class LangGraphProcess:
 
     def _build_graph(self, checkpointer=None, store=None):
         """
-        Build and return the main agent runnable.
-
+        Build and return the deep agent runnable.
         Args:
             checkpointer: Checkpoint saver instance
             store: Data store instance
 
         Returns:
-            Runnable: Agent runnable
+            Runnable: Deep agent runnable
         """
         # Load Secret
         if self.secrets is None:
             raise RuntimeError("Secrets are not loaded")
         secrets = self.secrets
-
-        # Create Manage Memory Tool
-        manage_memory = create_manage_memory_tool(
-            namespace=("memories", "{user_id}", "profile"),
-            schema=UserProfile,
-            actions_permitted=("create", "update", "delete"),
-            name="manage_memory",
-        )
-
-        # Create Search Memory Tool
-        search_memory = create_search_memory_tool(
-            namespace=("memories", "{user_id}"),
-            name="search_memory",
-        )
 
         # Create Azure AI Search retriever tool
         azure_ai_search = create_azure_ai_search_tool(
@@ -473,6 +451,11 @@ class LangGraphProcess:
             top_k=int(secrets.AZURE_AI_SEARCH_TOP_K),
         )
         
+        # Create Azure Dynamic Sessions Python REPL tool
+        sessions_python_repl = create_sessions_python_repl_tool(
+            pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_POOL_ENDPOINT
+        )
+
         # Create Web Search Tool (Grounding with bing search)
         web_search = {
             "type": "web_search",
@@ -482,30 +465,63 @@ class LangGraphProcess:
             },
         }
 
-        # Create Main Agent
-        main_agent = create_agent(
+        # Create Coding Agent
+        # coding_agent = create_deep_agent(
+        #     model=self.main_model,
+        #     tools=[],
+        #     system_prompt=self.prompt_cache["coding_agent.yaml"],
+        #     skills=[
+        #         "/skills/langchain-skills/",
+        #     ],
+        #     memory=[
+        #         "/memories/coding/AGENTS.md"
+        #     ],
+        #     context_schema=AgentContext,
+        #     checkpointer=checkpointer,
+        #     store=store,
+        #     backend=CompositeBackend(
+        #         default=StateBackend(),
+        #         routes={
+        #             "/memories/": StoreBackend(namespace=lambda rt: ("memories", "coding", rt.context.user_id)),
+        #         },
+        #     ),
+        # )
+
+        # Create Analyst Agent
+        analyst_agent = create_deep_agent(
             model=self.main_model,
             tools=[
-                manage_memory,          # LangMem
-                search_memory,          # LangMem
-                azure_ai_search,        # RAG
-                web_search,             # Web Search
+                sessions_python_repl
             ],
-            system_prompt=self.prompt_cache["example.yaml"],
+            system_prompt=self.prompt_cache["analyst_agent.yaml"],
+            skills=[],
+            memory=[],
+            context_schema=AgentContext,
+            checkpointer=checkpointer,
+            store=store,
+            backend=CompositeBackend(
+                default=StateBackend(),
+                routes={
+                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", "analyst", rt.context.user_id)),
+                },
+             ),
+            name="analyst_agent",
+        )
+
+        # Create Main Agent
+        main_agent = create_deep_agent(
+            model=self.main_model,
+            tools=[
+                azure_ai_search,
+                web_search,
+            ],
+            system_prompt=self.prompt_cache["main_agent.yaml"],
             middleware=[
                 # Model Middleware
                 ModelCallLimitMiddleware(run_limit=5, exit_behavior="end"),
 
                 # Tool Middleware
                 ToolCallLimitMiddleware(run_limit=5, exit_behavior="continue"),
-
-                # Message Middleware
-                SummarizationMiddleware(
-                    model=self.small_model,
-                    trigger=[("tokens", 20000)],
-                    keep=("messages", 20),
-                    token_counter=count_tokens_approximately,
-                ),
 
                 # PII Middleware
                 PIIMiddleware("email", strategy="mask"),
@@ -519,11 +535,31 @@ class LangGraphProcess:
                 azure_prompt_shield_middleware(
                     endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
                     credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
-                ),
+                )
             ],
-            state_schema=AgentState,
+            subagents=[
+                # CompiledSubAgent(
+                #     name="coding_agent",
+                #     description="Handles code reading, editing, execution, and test validation inside an isolated sandbox.",
+                #     runnable=coding_agent,
+                # ),
+                CompiledSubAgent(
+                    name="analyst_agent",
+                    description="Performs Python-based data analysis, calculations, tabular processing, and chart generation.",
+                    runnable=analyst_agent,
+                )
+            ],
+            skills=[],
+            memory=[],
+            context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,
+            backend=CompositeBackend(
+                default=StateBackend(),
+                routes={
+                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", rt.context.user_id)),
+                },
+            ),
             name="main_agent",
         )
 
@@ -552,10 +588,13 @@ class LangGraphProcess:
         # Input Values
         inputs = {
             "messages": [HumanMessage(content=user_query)],
-            "thread_id": thread_id,
-            "user_id": user_id,
-            "user_query": user_query,
         }
+
+        # Deep agents expect per-run identity data through runtime context.
+        context = AgentContext(
+            thread_id=thread_id,
+            user_id=user_id,
+        )
 
         # Runnable Config
         config = RunnableConfig(
@@ -568,13 +607,14 @@ class LangGraphProcess:
 
         # Stream Processing
         stream = self.graph.astream(
-            input=inputs, 
+            input=inputs,
             config=config,
+            context=context,
             subgraphs=True,
             stream_mode=[
-                "messages", 
-                "updates", 
-                "custom", 
+                "messages",
+                "updates",
+                "custom",
                 # "tasks" # optional
             ],
             version="v2",

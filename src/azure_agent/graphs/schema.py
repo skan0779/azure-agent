@@ -1,8 +1,19 @@
-from typing import Annotated, Literal, Optional, TypedDict
+from dataclasses import dataclass
+from typing import Annotated, Optional, TypedDict
 
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel
 
+@dataclass
+class AgentContext:
+    """
+    Runtime context for deep agents.
+
+    This is not automatically injected into the prompt. It exists so the
+    runtime, tools, and backends can access per-request identity data.
+    """
+    user_id: str
+    thread_id: str
 
 class AgentState(TypedDict, total=False):
     """
@@ -21,7 +32,6 @@ class AgentState(TypedDict, total=False):
     user_id: Annotated[str, "User ID"]
     user_query: Annotated[str, "User Question"]
     guardrail: Annotated[bool, "Guardrail Check"]
-
 
 class UserProfile(BaseModel):
     name: Optional[str] = None

@@ -47,6 +47,7 @@
 | Azure Container Apps | Deploy `azure-agent-worker` service |
 | Azure Container Apps | Deploy `azure-agent-web` service |
 | Azure Static Web Apps | Deploy `azure-agent-ui` service |
+| Azure Container Apps Session Pool | Pool type: `Python` |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 
@@ -212,6 +213,8 @@ Check `azure-agent-ui` status:
 | Model Routing | [model-router](https://ai.azure.com/catalog/models/model-router) | Azure AI Foundry |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
 | Web Search | [Web Search (Grounding with Bing Search)](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | - |
+| Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool |
+| Sandbox (coding) | []() | Azure Container Apps Session Pool |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [Langmem](https://github.com/langchain-ai/langmem) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
