@@ -28,7 +28,6 @@
 <p align="center">
   <img src="./docs/video/video.gif" width="100%" alt="Azure Agent demo" />
 </p>
-<br>
 
 ## Quickstart
 > Required and optional steps to start the service.
