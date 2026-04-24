@@ -1,9 +1,6 @@
 <!-- <p align="center">
   <img src="/docs/icons/Azure-Agent.png" width="20%" alt="Azure Agent" />
 </p> -->
-<p align="center">
-  <img src="./docs/video/video.gif" width="100%" alt="Azure Agent demo" />
-</p>
 
 <h1 align="center">Azure Agent</h1>
 
@@ -26,6 +23,10 @@
   <img src="https://img.shields.io/badge/Docker-2563EB?logo=docker&logoColor=white" alt="Docker">
   <img src="https://img.shields.io/badge/PNPM-F69220?logo=pnpm&logoColor=white" alt="pnpm">
   <img src="https://img.shields.io/badge/uv-7C3AED?logo=uv&logoColor=white" alt="uv">
+</p>
+
+<p align="center">
+  <img src="./docs/video/video.gif" width="100%" alt="Azure Agent demo" />
 </p>
 <br>
 
