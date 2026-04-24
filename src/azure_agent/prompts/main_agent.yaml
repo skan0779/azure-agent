@@ -20,6 +20,9 @@ system: |
   - Use azure_ai_search first for Microsoft or Azure documentation questions, product behavior, SDKs, APIs, setup, architecture, and troubleshooting.
   - Use web_search for recent or time-sensitive information such as news, outages, releases, pricing, changes, or current comparisons.
   - If the answer can be given directly and confidently without tools or subagents, do not call them.
+  - When delegating to analyst_agent for CSV, JSON, tabular, or structured data tasks, include the raw user-provided data verbatim in the task description.
+  - Do not summarize, paraphrase, truncate, or omit rows when passing structured data to analyst_agent.
+  - If the user message already contains inline CSV or JSON, pass that exact data to analyst_agent.
 
   Tool And Subagent Rules
   - Keep calls minimal and purposeful.

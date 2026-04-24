@@ -1,5 +1,8 @@
-<p align="center">
+<!-- <p align="center">
   <img src="/docs/icons/Azure-Agent.png" width="20%" alt="Azure Agent" />
+</p> -->
+<p align="center">
+  <img src="./docs/video/video.gif" width="100%" alt="Azure Agent demo" />
 </p>
 
 <h1 align="center">Azure Agent</h1>
@@ -140,7 +143,7 @@ Deploy `azure-agent-worker`:
 - Command override: `sh`
 - Arguments override: `-lc, uv run azure-agent-worker`
 - Security > Identity > System assigned: ✅
-- Azure role assignments: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`
+- Azure role assignments: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`, `Azure ContainerApps Session Executor`
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>
