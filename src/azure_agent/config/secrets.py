@@ -43,7 +43,8 @@ class AppSecrets:
     AZURE_AI_CONTENT_SAFETY_ENDPOINT: str
     AZURE_AI_CONTENT_SAFETY_API_KEY: str
     # Azure Container Apps Dynamic Sessions
-    AZURE_DYNAMIC_SESSIONS_POOL_ENDPOINT: str
+    AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT: str
+    AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT: str
 
 
 async def load_app_secrets(secret_client: SecretClient) -> AppSecrets:

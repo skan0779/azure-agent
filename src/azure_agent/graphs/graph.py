@@ -14,6 +14,7 @@ from langchain_core.messages import HumanMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores.azuresearch import AzureSearch
+from langchain_azure_dynamic_sessions.backends import SessionsBashBackend
 from langchain.agents.middleware import (
     ModelCallLimitMiddleware,
     ToolCallLimitMiddleware,
@@ -28,7 +29,7 @@ from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
 from azure_agent.graphs.schema import AgentContext
 from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
-from azure_agent.tools.sessions_python_repl import create_sessions_python_repl_tool
+from azure_agent.tools.sessions_python_repl import create_python_repl_tool
 from azure_agent.middlewares.azure_ai_content_safety import (
     azure_content_moderation_middleware,
     azure_prompt_shield_middleware,
@@ -154,10 +155,10 @@ class LangGraphProcess:
             if inspect.isawaitable(maybe):
                 await maybe
 
+        # Load Prompt
         await self._load_prompts([
             "main_agent.yaml",
-            "analyst_agent.yaml",
-            # "coding_agent.yaml",
+            "sandbox_agent.yaml",
         ])
 
         # Build Graph
@@ -452,8 +453,8 @@ class LangGraphProcess:
         )
         
         # Create Azure Dynamic Sessions Python REPL tool
-        sessions_python_repl = create_sessions_python_repl_tool(
-            pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_POOL_ENDPOINT
+        python_repl_tool = create_python_repl_tool(
+            pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT
         )
 
         # Create Web Search Tool (Grounding with bing search)
@@ -465,47 +466,28 @@ class LangGraphProcess:
             },
         }
 
-        # Create Coding Agent
-        # coding_agent = create_deep_agent(
-        #     model=self.main_model,
-        #     tools=[],
-        #     system_prompt=self.prompt_cache["coding_agent.yaml"],
-        #     skills=[
-        #         "/skills/langchain-skills/",
-        #     ],
-        #     memory=[
-        #         "/memories/coding/AGENTS.md"
-        #     ],
-        #     context_schema=AgentContext,
-        #     checkpointer=checkpointer,
-        #     store=store,
-        #     backend=CompositeBackend(
-        #         default=StateBackend(),
-        #         routes={
-        #             "/memories/": StoreBackend(namespace=lambda rt: ("memories", "coding", rt.context.user_id)),
-        #         },
-        #     ),
-        # )
-
-        # Create Analyst Agent
-        analyst_agent = create_deep_agent(
+        # Create Sandbox Agent
+        sandbox_agent = create_deep_agent(
             model=self.main_model,
             tools=[
-                sessions_python_repl
+                python_repl_tool
             ],
-            system_prompt=self.prompt_cache["analyst_agent.yaml"],
+            system_prompt=self.prompt_cache["sandbox_agent.yaml"],
             skills=[],
             memory=[],
             context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,
-            backend=CompositeBackend(
-                default=StateBackend(),
+            backend=lambda rt: CompositeBackend(
+                default=SessionsBashBackend(
+                    pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
+                    session_id=f"sandbox-{rt.context.thread_id}",
+                ),
                 routes={
-                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", "analyst", rt.context.user_id)),
+                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", "sandbox", rt.context.user_id)),
                 },
              ),
-            name="analyst_agent",
+            name="sandbox_agent",
         )
 
         # Create Main Agent
@@ -538,15 +520,10 @@ class LangGraphProcess:
                 )
             ],
             subagents=[
-                # CompiledSubAgent(
-                #     name="coding_agent",
-                #     description="Handles code reading, editing, execution, and test validation inside an isolated sandbox.",
-                #     runnable=coding_agent,
-                # ),
                 CompiledSubAgent(
-                    name="analyst_agent",
-                    description="Performs Python-based data analysis, calculations, tabular processing, and chart generation.",
-                    runnable=analyst_agent,
+                    name="sandbox_agent",
+                    description="Uses an isolated workspace for computation, file processing, code execution, and data analysis.",
+                    runnable=sandbox_agent,
                 )
             ],
             skills=[],

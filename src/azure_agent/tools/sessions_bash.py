@@ -1,19 +1,19 @@
 from langchain.tools import tool
 from langgraph.prebuilt import ToolRuntime
-from langchain_azure_dynamic_sessions import SessionsPythonREPLTool
+from langchain_azure_dynamic_sessions import SessionsBashTool
 
-def create_python_repl_tool(pool_management_endpoint: str):
+def create_bash_tool(pool_management_endpoint: str):
 
     @tool
-    def python_repl_tool(
+    def bash_tool(
         input: str,
         runtime: ToolRuntime,
     ) -> str:
-        """Run Python in an Azure Container Apps Dynamic Session."""
+        """Run bash in an Azure Container Apps Dynamic Session."""
         session_id = f"sandbox-{runtime.context.thread_id}"
         endpoint = pool_management_endpoint.rstrip("/") + "/"
 
-        tool = SessionsPythonREPLTool(
+        tool = SessionsBashTool(
             sanitize_input=True,
             pool_management_endpoint=endpoint,
             session_id=session_id,
@@ -21,4 +21,4 @@ def create_python_repl_tool(pool_management_endpoint: str):
 
         return tool.invoke(input)
 
-    return python_repl_tool
+    return bash_tool
