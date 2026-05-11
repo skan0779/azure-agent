@@ -38,7 +38,7 @@ export type AgentAttachmentAdapterOptions = {
 };
 
 export class AgentAttachmentAdapter implements AttachmentAdapter {
-  accept = "*/*";
+  accept = "*";
 
   constructor(private readonly options: AgentAttachmentAdapterOptions) {}
 
