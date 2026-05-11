@@ -125,6 +125,121 @@ export const cancelAgentJobById = async ({
   }
 };
 
+export type AgentFileUploadResponse = {
+  file_id: string;
+  thread_id: string;
+  role: "upload" | "artifact";
+  filename: string;
+  mime_type: string | null;
+  size: number;
+  created_at: string;
+};
+
+export const uploadAgentFile = async ({
+  baseUrl,
+  threadId,
+  userId,
+  file,
+  signal,
+}: {
+  baseUrl: string;
+  threadId: string;
+  userId: string;
+  file: { buffer: Buffer; filename: string; mimeType?: string };
+  signal?: AbortSignal;
+}): Promise<AgentFileUploadResponse> => {
+  const form = new FormData();
+  form.append("thread_id", threadId);
+  form.append(
+    "file",
+    new Blob([new Uint8Array(file.buffer)], {
+      type: file.mimeType || "application/octet-stream",
+    }),
+    file.filename,
+  );
+
+  const response = await fetch(buildUrl(baseUrl, "/agent/api/files"), {
+    method: "POST",
+    headers: {
+      "X-User-Id": userId,
+    },
+    body: form,
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  return (await response.json()) as AgentFileUploadResponse;
+};
+
+export const downloadAgentFile = async ({
+  baseUrl,
+  fileId,
+  userId,
+  signal,
+}: {
+  baseUrl: string;
+  fileId: string;
+  userId: string;
+  signal?: AbortSignal;
+}): Promise<Response> => {
+  const response = await fetch(
+    buildUrl(baseUrl, `/agent/api/files/${encodeURIComponent(fileId)}/download`),
+    {
+      method: "GET",
+      headers: {
+        "X-User-Id": userId,
+      },
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  return response;
+};
+
+export type DeleteAgentThreadFilesResponse = {
+  deleted_files: number;
+  deleted_blobs: number;
+};
+
+export const deleteAgentThreadFiles = async ({
+  baseUrl,
+  threadId,
+  userId,
+  signal,
+}: {
+  baseUrl: string;
+  threadId: string;
+  userId: string;
+  signal?: AbortSignal;
+}): Promise<DeleteAgentThreadFilesResponse> => {
+  const response = await fetch(
+    buildUrl(
+      baseUrl,
+      `/agent/api/threads/${encodeURIComponent(threadId)}/files`,
+    ),
+    {
+      method: "DELETE",
+      headers: {
+        "X-User-Id": userId,
+      },
+      signal,
+    },
+  );
+
+  if (!response.ok) {
+    throw new Error(await parseErrorMessage(response));
+  }
+
+  return (await response.json()) as DeleteAgentThreadFilesResponse;
+};
+
 export async function* streamAgentEvents({
   eventsUrl,
   userId,

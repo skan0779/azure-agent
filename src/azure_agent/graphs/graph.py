@@ -10,7 +10,7 @@ from redis.asyncio import Redis
 
 from fastapi.encoders import jsonable_encoder
 
-from langchain_core.messages import HumanMessage, message_to_dict
+from langchain_core.messages import HumanMessage, SystemMessage, message_to_dict
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import AzureChatOpenAI, AzureOpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores.azuresearch import AzureSearch
@@ -27,12 +27,16 @@ from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
+from azure_agent.files import AgentFileRepository
 from azure_agent.graphs.schema import AgentContext
 from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
 from azure_agent.tools.sessions_python_repl import create_python_repl_tool
 from azure_agent.middlewares.azure_ai_content_safety import (
     azure_content_moderation_middleware,
     azure_prompt_shield_middleware,
+)
+from azure_agent.middlewares.azure_dynamic_session import (
+    SessionsFileSyncMiddleware,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,6 +67,8 @@ class LangGraphProcess:
 
         # Runtime clients / models
         self.BLOB_CONTAINER_CLIENT: ContainerClient | None = None
+        self.FILES_BLOB_CONTAINER_CLIENT: ContainerClient | None = None
+        self.agent_file_repository: AgentFileRepository | None = None
         self.main_model = None
         self.small_model = None
         self.embedding_model = None
@@ -92,6 +98,10 @@ class LangGraphProcess:
         """
         await self._load_secrets()
         self._load_instance()
+
+        # Open file repository connection pool
+        if self.agent_file_repository is not None:
+            await self.agent_file_repository.open()
 
         # Redis Client
         if self.secrets is None:
@@ -184,8 +194,16 @@ class LangGraphProcess:
         # Initialize Blob Container Client
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
             conn_str=secrets.BLOB_CONNECTION_STRING,
-            container_name=secrets.BLOB_CONTAINER_NAME,
+            container_name="prompts",
         )
+        self.FILES_BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
+            conn_str=secrets.BLOB_CONNECTION_STRING,
+            container_name="files",
+        )
+        self.agent_file_repository = AgentFileRepository(
+            conn_string=secrets.POSTGRES_CONN_STRING,
+        )
+
 
         # Initialize Azure OpenAI Models
         self.main_model = ChatOpenAI(
@@ -285,6 +303,31 @@ class LangGraphProcess:
             except Exception as exc:
                 logger.warning("[graph.py] Failed to close blob container client: %s", exc)
             self.BLOB_CONTAINER_CLIENT = None
+
+        # Cleanup Files Blob Client
+        files_blob_container_client = getattr(self, "FILES_BLOB_CONTAINER_CLIENT", None)
+        if files_blob_container_client is not None:
+            try:
+                close = getattr(files_blob_container_client, "close", None)
+                if callable(close):
+                    maybe = close()
+                    if inspect.isawaitable(maybe):
+                        await maybe
+            except Exception as exc:
+                logger.warning("[graph.py] Failed to close files blob container client: %s", exc)
+            self.FILES_BLOB_CONTAINER_CLIENT = None
+
+        # Drop Repository Reference
+        agent_file_repository = getattr(self, "agent_file_repository", None)
+        if agent_file_repository is not None:
+            try:
+                await agent_file_repository.close()
+            except Exception as exc:
+                logger.warning(
+                    "[graph.py] Failed to close agent file repository pool: %s",
+                    exc,
+                )
+            self.agent_file_repository = None
 
         # Cleanup Store
         store = getattr(self, "store", None)
@@ -465,7 +508,7 @@ class LangGraphProcess:
                 "country": "KR",
             },
         }
-
+        
         # Create Sandbox Agent
         sandbox_agent = create_deep_agent(
             model=self.main_model,
@@ -473,6 +516,13 @@ class LangGraphProcess:
                 python_repl_tool
             ],
             system_prompt=self.prompt_cache["sandbox_agent.yaml"],
+            middleware=[
+                SessionsFileSyncMiddleware(
+                    pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
+                    blob_container_client=self.FILES_BLOB_CONTAINER_CLIENT,
+                    file_repository=self.agent_file_repository,
+                )
+            ],
             skills=[],
             memory=[],
             context_schema=AgentContext,
@@ -481,7 +531,7 @@ class LangGraphProcess:
             backend=lambda rt: CompositeBackend(
                 default=SessionsBashBackend(
                     pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
-                    session_id=f"sandbox-{rt.context.thread_id}",
+                    session_id=f"sandbox-{rt.context.user_id}-{rt.context.thread_id}",
                 ),
                 routes={
                     "/memories/": StoreBackend(namespace=lambda rt: ("memories", "sandbox", rt.context.user_id)),
@@ -545,6 +595,7 @@ class LangGraphProcess:
     async def main(
         self,
         thread_id: str,
+        job_id: str,
         user_id: str,
         user_query: str,
     ):
@@ -553,6 +604,7 @@ class LangGraphProcess:
 
         Args:
             thread_id: Thread ID (Session ID)
+            job_id: Job ID
             user_id: User ID
             user_query: User Query
         Yields:
@@ -560,24 +612,28 @@ class LangGraphProcess:
         """
         
         # Logging
-        logger.info("[graph.py] LangGraphProcess Request : thread_id=%s, user_id=%s, user_query=%s", thread_id, user_id, user_query)
+        logger.info("[graph.py] LangGraphProcess Request : thread_id=%s, job_id=%s, user_id=%s, user_query=%s", thread_id, job_id, user_id, user_query)
 
         # Input Values
         inputs = {
-            "messages": [HumanMessage(content=user_query)],
+            "messages": [
+                HumanMessage(content=user_query),
+            ],
         }
 
         # Deep agents expect per-run identity data through runtime context.
         context = AgentContext(
             thread_id=thread_id,
+            job_id=job_id, 
             user_id=user_id,
         )
 
         # Runnable Config
         config = RunnableConfig(
-            recursion_limit=50,
+            recursion_limit=30,
             configurable={
                 "thread_id": thread_id,
+                "job_id": job_id,
                 "user_id": user_id,
             },
         )
@@ -654,6 +710,7 @@ class LangGraphProcess:
     async def run_job(
         self,
         thread_id: str,
+        job_id: str,
         user_id: str,
         user_query: str,
         cancel: Callable[[], Awaitable[bool]] | None = None,
@@ -662,6 +719,7 @@ class LangGraphProcess:
         JobWorker LangGraphProcess execution wrapper.
         Args:
             thread_id: Thread ID (Session ID)
+            job_id: Job ID
             user_id: User ID
             user_query: User Query
             cancel (optional): Cancellation callable.
@@ -670,6 +728,7 @@ class LangGraphProcess:
         """
         async for event in self.main(
             thread_id=thread_id,
+            job_id=job_id,
             user_id=user_id,
             user_query=user_query,
         ):

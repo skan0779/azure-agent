@@ -1,5 +1,7 @@
 import type { FastifyPluginAsync } from "fastify";
 
+import { deleteAgentThreadFiles } from "../lib/azure-agent-api.js";
+import { config } from "../config.js";
 import type { ThreadRepository } from "../lib/thread-repository.js";
 import {
   deleteThreadRoute,
@@ -166,6 +168,41 @@ export const buildThreadsRoutes = ({
           detail: "Missing X-User-Id header",
         };
       }
+
+      try {
+        const cleanup = await deleteAgentThreadFiles({
+          baseUrl: config.agentApiBaseUrl,
+          threadId: parsed.data.threadId,
+          userId,
+        });
+        request.log.info(
+          {
+            threadId: parsed.data.threadId,
+            userId,
+            deletedFiles: cleanup.deleted_files,
+            deletedBlobs: cleanup.deleted_blobs,
+          },
+          "Deleted agent files for thread",
+        );
+      } catch (error) {
+        request.log.error(
+          {
+            err: error,
+            threadId: parsed.data.threadId,
+            userId,
+          },
+          "Failed to delete agent files for thread; aborting thread deletion",
+        );
+        reply.code(502);
+        return {
+          error: "agent_cleanup_failed",
+          detail:
+            error instanceof Error
+              ? error.message
+              : "Failed to delete agent files",
+        };
+      }
+
       await threadRepository.deleteThread({
         threadId: parsed.data.threadId,
         userId,

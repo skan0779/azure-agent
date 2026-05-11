@@ -50,7 +50,9 @@
 | Azure Container Apps | Deploy `azure-agent-worker` service |
 | Azure Container Apps | Deploy `azure-agent-web` service |
 | Azure Static Web Apps | Deploy `azure-agent-ui` service |
+| Azure Container App Job | Trigger type: `Manual` |
 | Azure Container Apps Session Pool | Pool type: `Python` |
+| Azure Container Apps Session Pool | Pool type: `Shell` |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 

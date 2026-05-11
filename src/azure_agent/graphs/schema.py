@@ -12,8 +12,10 @@ class AgentContext:
     This is not automatically injected into the prompt. It exists so the
     runtime, tools, and backends can access per-request identity data.
     """
+    
     user_id: str
     thread_id: str
+    job_id: str
 
 class AgentState(TypedDict, total=False):
     """

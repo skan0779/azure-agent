@@ -13,6 +13,7 @@ RUN useradd -m -u 1000 appuser
 
 # Copy dependency files and package source
 COPY pyproject.toml uv.lock ./
+COPY alembic.ini ./
 COPY src ./src
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONPATH="/app/src"

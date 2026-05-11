@@ -323,7 +323,18 @@ const UserMessage: FC = () => {
         </ActionBarPrimitive.Root>
 
         <div className="rounded-3xl bg-secondary px-5 py-2 text-foreground dark:bg-white/5 dark:text-[#eee]">
-          <MessagePrimitive.Parts />
+          <MessagePrimitive.Parts>
+            {({ part }) => {
+              if (part.type === "text") return <MarkdownText />;
+              if (
+                part.type === "data" &&
+                (part.name === "agent-file" || part.name === "artifact")
+              ) {
+                return <UserAttachmentChip data={part.data} />;
+              }
+              return null;
+            }}
+          </MessagePrimitive.Parts>
         </div>
       </div>
 
@@ -368,6 +379,8 @@ const AssistantMessage: FC = () => {
               if (part.type === "file") return <AssistantFilePart part={part} />;
               if (part.type === "tool-call")
                 return part.toolUI ?? <ToolFallback {...part} />;
+              if (part.type === "data" && part.name === "artifact")
+                return <ArtifactCard data={part.data} />;
               return null;
             }}
           </MessagePrimitive.Parts>
@@ -477,6 +490,118 @@ const AssistantFilePart = ({
         <div className="truncate text-xs text-[#9f9f9f]">{part.mimeType}</div>
       </div>
 
+      <ExternalLinkIcon className="size-4 shrink-0 text-[#8f8f8f]" />
+    </a>
+  );
+};
+
+const formatBytes = (size: number | null | undefined): string => {
+  if (typeof size !== "number" || !Number.isFinite(size) || size <= 0) {
+    return "";
+  }
+  const units = ["B", "KB", "MB", "GB"];
+  let value = size;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unitIndex]}`;
+};
+
+const resolveArtifactHref = (downloadUrl: string | undefined): string => {
+  if (!downloadUrl) return "#";
+  if (/^https?:\/\//i.test(downloadUrl)) return downloadUrl;
+  const base =
+    process.env.NEXT_PUBLIC_AGENT_WEB_URL?.trim().replace(/\/$/, "") ?? "";
+  return `${base}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
+};
+
+const UserAttachmentChip = ({ data }: { data: unknown }) => {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const payload = data as Record<string, unknown>;
+  const filename =
+    typeof payload.filename === "string"
+      ? payload.filename
+      : typeof payload.name === "string"
+        ? payload.name
+        : "Attached file";
+  const mimeType =
+    typeof payload.mime_type === "string"
+      ? payload.mime_type
+      : typeof payload.mimeType === "string"
+        ? payload.mimeType
+        : undefined;
+  const size =
+    typeof payload.size === "number" ? payload.size : null;
+  const sizeLabel = formatBytes(size);
+  const subtitle = [mimeType, sizeLabel].filter(Boolean).join(" · ");
+
+  return (
+    <div className="mb-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#d8d8d8]">
+        <FileTextIcon className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-sm text-[#f1f1f1]">
+          {filename}
+        </div>
+        {subtitle ? (
+          <div className="truncate text-xs text-[#9f9f9f]">{subtitle}</div>
+        ) : null}
+      </div>
+    </div>
+  );
+};
+
+const ArtifactCard = ({ data }: { data: unknown }) => {
+  if (!data || typeof data !== "object") {
+    return null;
+  }
+  const payload = data as Record<string, unknown>;
+  const filename =
+    typeof payload.filename === "string" ? payload.filename : "Generated file";
+  const mimeType =
+    typeof payload.mime_type === "string"
+      ? payload.mime_type
+      : typeof payload.mimeType === "string"
+        ? payload.mimeType
+        : undefined;
+  const size =
+    typeof payload.size === "number"
+      ? payload.size
+      : null;
+  const downloadUrl =
+    typeof payload.downloadUrl === "string"
+      ? payload.downloadUrl
+      : typeof payload.download_url === "string"
+        ? payload.download_url
+        : undefined;
+  const href = resolveArtifactHref(downloadUrl);
+  const sizeLabel = formatBytes(size);
+  const subtitle = [mimeType, sizeLabel].filter(Boolean).join(" · ");
+
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      download={filename}
+      className="mt-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+    >
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#d8d8d8]">
+        <FileTextIcon className="size-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate font-medium text-sm text-[#f1f1f1]">
+          {filename}
+        </div>
+        {subtitle ? (
+          <div className="truncate text-xs text-[#9f9f9f]">{subtitle}</div>
+        ) : null}
+      </div>
       <ExternalLinkIcon className="size-4 shrink-0 text-[#8f8f8f]" />
     </a>
   );

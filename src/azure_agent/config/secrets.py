@@ -37,6 +37,7 @@ class AppSecrets:
     REDIS_DB: str
     # Azure Database for PostgreSQL
     POSTGRES_CONN_STRING: str
+    POSTGRES_WEB_CONN_STRING: str
     # Tiktoken
     TIKTOKEN_ENCODER: str
     # Azure AI Content Safety

@@ -56,13 +56,23 @@ const stepStartPartSchema = z.object({
   type: z.literal("step-start"),
 });
 
-const dataPartSchema = z
-  .object({
-    type: z.string().regex(/^data-/),
-    id: z.string().optional(),
-    data: z.unknown(),
-  })
-  .passthrough();
+const dataPartSchema = z.union([
+  z
+    .object({
+      type: z.string().regex(/^data-/),
+      id: z.string().optional(),
+      data: z.unknown(),
+    })
+    .passthrough(),
+  z
+    .object({
+      type: z.literal("data"),
+      name: z.string().min(1),
+      id: z.string().optional(),
+      data: z.unknown(),
+    })
+    .passthrough(),
+]);
 
 const toolApprovalPendingSchema = z.object({
   id: z.string().min(1),

@@ -13,6 +13,7 @@
     "@azure/identity": "^4.13.1",
     "@azure/keyvault-secrets": "^4.11.1",
     "@fastify/cors": "^11.1.0",
+    "@fastify/multipart": "^10.0.0",
     "ai": "^6.0.156",
     "fastify": "^5.6.1",
     "pg": "^8.20.0",

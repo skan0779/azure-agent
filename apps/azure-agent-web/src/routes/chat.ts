@@ -14,8 +14,10 @@ import {
   buildDynamicToolParts,
   collectToolSnapshotsFromMessagesEvent,
   collectToolSnapshotsFromUpdate,
+  composeUserQueryWithAttachments,
   createAutoThreadTitle,
   extractLangChainChunkText,
+  extractLastUserAttachments,
   extractLastUserMessage,
   extractLastUserText,
   resolveThreadId,
@@ -222,6 +224,12 @@ export const buildChatRoutes = ({
     let cancelRequested = false;
     let assistantMessageId: string | null = null;
     let assistantText = "";
+    type ArtifactPart = {
+      type: "data-artifact";
+      id: string;
+      data: Record<string, unknown>;
+    };
+    const artifactParts = new Map<string, ArtifactPart>();
     const toolSnapshots = new Map<
       string,
       {
@@ -343,11 +351,33 @@ export const buildChatRoutes = ({
             "Creating agent job",
           );
 
+          const attachedFiles = extractLastUserAttachments(messages);
+          const userQueryForAgent = composeUserQueryWithAttachments(
+            lastUserText,
+            attachedFiles,
+          );
+
+          if (attachedFiles.length > 0) {
+            app.log.info(
+              {
+                requestId: request.id,
+                threadId: resolvedThreadId,
+                userId: resolvedUserId,
+                attachedFileCount: attachedFiles.length,
+                attachedFiles: attachedFiles.map((file) => ({
+                  fileId: file.fileId,
+                  filename: file.filename,
+                })),
+              },
+              "Composed user query with attached files",
+            );
+          }
+
           const job = await createAgentJob({
             baseUrl: config.agentApiBaseUrl,
             threadId: resolvedThreadId,
             userId: resolvedUserId,
-            userQuery: lastUserText,
+            userQuery: userQueryForAgent,
             signal: abortController.signal,
           });
           activeJob = job;
@@ -544,6 +574,52 @@ export const buildChatRoutes = ({
               continue;
             }
 
+            if (event.type === "custom") {
+              const customData =
+                event.data && typeof event.data === "object"
+                  ? (event.data as Record<string, unknown>)
+                  : null;
+              if (customData?.event === "artifact_created") {
+                const fileId =
+                  typeof customData.file_id === "string"
+                    ? customData.file_id
+                    : "";
+                const downloadUrl = fileId
+                  ? `/api/files/${encodeURIComponent(fileId)}/download`
+                  : undefined;
+                const artifactPartId = fileId || crypto.randomUUID();
+                const artifactData = {
+                  ...customData,
+                  downloadUrl,
+                };
+                writer.write({
+                  type: "data-artifact",
+                  id: artifactPartId,
+                  data: artifactData,
+                });
+                artifactParts.set(artifactPartId, {
+                  type: "data-artifact",
+                  id: artifactPartId,
+                  data: artifactData,
+                });
+                app.log.info(
+                  {
+                    requestId: request.id,
+                    threadId: resolvedThreadId,
+                    userId: resolvedUserId,
+                    jobId: job.job_id,
+                    fileId,
+                    filename:
+                      typeof customData.filename === "string"
+                        ? customData.filename
+                        : undefined,
+                  },
+                  "Forwarded artifact_created event to client",
+                );
+                continue;
+              }
+            }
+
             if (event.type === "complete") {
               isTerminal = true;
               app.log.info(
@@ -640,53 +716,63 @@ export const buildChatRoutes = ({
               type: "text-end",
               id: textId,
             });
+          }
 
-            if (threadRepository && (assistantText.trim() || toolSnapshots.size > 0)) {
-              assistantMessageId ??= crypto.randomUUID();
-              const toolParts = buildDynamicToolParts(toolSnapshots);
-              const citationParts = buildCitationParts(toolSnapshots);
-              app.log.info(
-                {
-                  requestId: request.id,
-                  threadId: resolvedThreadId,
-                  userId: resolvedUserId,
-                  jobId: job.job_id,
-                  toolSnapshotCount: toolSnapshots.size,
-                  toolPartCount: toolParts.length,
-                  citationPartCount: citationParts.length,
-                  firstCitation:
-                    citationParts.length > 0
-                      ? {
-                          id: citationParts[0].id,
-                          href: citationParts[0].data.href,
-                          title: citationParts[0].data.title,
-                        }
-                      : undefined,
-                },
-                "Prepared assistant persistence payload",
-              );
-              await threadRepository.upsertMessage({
+          const hasPersistableContent =
+            assistantText.trim().length > 0 ||
+            toolSnapshots.size > 0 ||
+            artifactParts.size > 0;
+
+          if (threadRepository && hasPersistableContent) {
+            assistantMessageId ??= crypto.randomUUID();
+            const toolParts = buildDynamicToolParts(toolSnapshots);
+            const citationParts = buildCitationParts(toolSnapshots);
+            const artifactPartList = [...artifactParts.values()];
+            app.log.info(
+              {
+                requestId: request.id,
                 threadId: resolvedThreadId,
-                message: {
-                  id: assistantMessageId,
-                  role: "assistant",
-                  parts: [
-                    ...toolParts,
-                    ...citationParts,
-                    ...(assistantText.trim()
-                      ? [
-                          {
-                            type: "text" as const,
-                            text: assistantText,
-                            state: "done" as const,
-                          },
-                        ]
-                      : []),
-                  ],
-                },
-              });
-            }
-          } else if (!sawText) {
+                userId: resolvedUserId,
+                jobId: job.job_id,
+                toolSnapshotCount: toolSnapshots.size,
+                toolPartCount: toolParts.length,
+                citationPartCount: citationParts.length,
+                artifactPartCount: artifactPartList.length,
+                firstCitation:
+                  citationParts.length > 0
+                    ? {
+                        id: citationParts[0].id,
+                        href: citationParts[0].data.href,
+                        title: citationParts[0].data.title,
+                      }
+                    : undefined,
+              },
+              "Prepared assistant persistence payload",
+            );
+            await threadRepository.upsertMessage({
+              threadId: resolvedThreadId,
+              message: {
+                id: assistantMessageId,
+                role: "assistant",
+                parts: [
+                  ...toolParts,
+                  ...citationParts,
+                  ...artifactPartList,
+                  ...(assistantText.trim()
+                    ? [
+                        {
+                          type: "text" as const,
+                          text: assistantText,
+                          state: "done" as const,
+                        },
+                      ]
+                    : []),
+                ],
+              },
+            });
+          }
+
+          if (!textId && !sawText) {
             writer.write({
               type: "data-status",
               data: {
@@ -694,10 +780,12 @@ export const buildChatRoutes = ({
                 threadId: resolvedThreadId,
                 userId: resolvedUserId,
                 jobId: job.job_id,
-                note: "No assistant text chunks were emitted",
+                note: hasPersistableContent
+                  ? "Assistant produced non-text output only"
+                  : "No assistant text chunks were emitted",
               },
             });
-          } else {
+          } else if (!textId) {
             writer.write({
               type: "data-status",
               data: {

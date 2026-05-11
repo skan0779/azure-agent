@@ -3,6 +3,7 @@ import Fastify from "fastify";
 
 import { config } from "./config.js";
 import { buildChatRoutes } from "./routes/chat.js";
+import { filesRoutes } from "./routes/files.js";
 import { healthRoutes } from "./routes/health.js";
 import { buildThreadsRoutes } from "./routes/threads.js";
 import type { ThreadRepository } from "./lib/thread-repository.js";
@@ -31,6 +32,7 @@ export const buildApp = ({
   });
 
   void app.register(healthRoutes);
+  void app.register(filesRoutes);
   void app.register(
     buildChatRoutes({
       threadRepository,

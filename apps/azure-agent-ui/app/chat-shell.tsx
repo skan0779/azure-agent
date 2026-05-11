@@ -28,6 +28,7 @@ import {
 } from "@/lib/optimistic-thread-titles";
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
+import { AgentAttachmentAdapter } from "@/lib/attachment-adapter";
 
 const DEFAULT_USER_ID = "1015520";
 
@@ -429,10 +430,35 @@ const useLocalChatThreadRuntime = ({
     });
   }, [apiBaseUrl, currentTitle, latestUserMessageId, latestUserText, remoteId, userId]);
 
-  const runtime = useAISDKRuntime({
-    ...chat,
-    stop,
-  });
+  const runtimeThreadKeyForUploadRef = useRef<string | null>(
+    runtimeThreadKey ?? null,
+  );
+
+  useEffect(() => {
+    runtimeThreadKeyForUploadRef.current = runtimeThreadKey ?? null;
+  }, [runtimeThreadKey]);
+
+  const attachmentAdapter = useMemo(
+    () =>
+      new AgentAttachmentAdapter({
+        apiBaseUrl,
+        userId,
+        getThreadId: () => runtimeThreadKeyForUploadRef.current,
+      }),
+    [apiBaseUrl, userId],
+  );
+
+  const runtime = useAISDKRuntime(
+    {
+      ...chat,
+      stop,
+    },
+    {
+      adapters: {
+        attachments: attachmentAdapter,
+      },
+    },
+  );
 
   if (transport instanceof AssistantChatTransport) {
     transport.setRuntime(assistantRuntime);

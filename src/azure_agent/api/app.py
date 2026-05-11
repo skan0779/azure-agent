@@ -5,21 +5,25 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
+from fastapi.openapi.docs import (
+    get_swagger_ui_html,
+    get_swagger_ui_oauth2_redirect_html,
+)
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
+from azure.storage.blob.aio import ContainerClient
 
+from azure_agent.api.routes.files import router as files_router
 from azure_agent.api.routes.health import router as health_router
 from azure_agent.api.routes.job import router as job_router
 from azure_agent.config import load_runtime_config
 from azure_agent.api.routes.ping import router as ping_router
+from azure_agent.files import AgentFileRepository
 from azure_agent.infra.key_vault import create_secret_client
 from azure_agent.infra.redis import close_redis_client, create_redis_stream_client
 from azure_agent.session import SessionManager
 
 logger = logging.getLogger(__name__)
-
-JOB_PATH_PREFIX = "/agent/api/jobs"
 
 logging.basicConfig(
     level="INFO",
@@ -37,6 +41,30 @@ async def lifespan(app: FastAPI):
     # Initialize Secret Client
     secret_client = create_secret_client()
 
+    # Initialize file storage dependencies
+    try:
+        app.state.blob_container_client = ContainerClient.from_connection_string(
+            conn_str=str(secret_client.get_secret("BLOB-CONNECTION-STRING").value),
+            container_name="files",
+        )
+        app.state.agent_file_repository = AgentFileRepository(
+            conn_string=str(secret_client.get_secret("POSTGRES-WEB-CONN-STRING").value),
+        )
+        await app.state.agent_file_repository.open()
+        logger.info("[app.py] File storage initialize success")
+    except Exception as exc:
+        agent_file_repository = getattr(app.state, "agent_file_repository", None)
+        if agent_file_repository is not None:
+            try:
+                await agent_file_repository.close()
+            except Exception:
+                logger.warning("[app.py] Failed to close agent file repository pool")
+        app.state.blob_container_client = None
+        app.state.agent_file_repository = None
+        secret_client.close()
+        logger.exception("[app.py] Failed to initialize file storage")
+        raise RuntimeError("File storage initialization failed") from exc
+
     # Initialize Redis Stream Client (queue)
     redis_stream_client = None
     try:
@@ -50,24 +78,50 @@ async def lifespan(app: FastAPI):
         )
         logger.info("[app.py] Stream Redis Initialize Success")
     except Exception as exc:
+        blob_container_client = getattr(app.state, "blob_container_client", None)
+        agent_file_repository = getattr(app.state, "agent_file_repository", None)
+        if redis_stream_client is not None:
+            await close_redis_client(redis_stream_client)
+        if blob_container_client is not None:
+            await blob_container_client.close()
+        if agent_file_repository is not None:
+            try:
+                await agent_file_repository.close()
+            except Exception:
+                logger.warning("[app.py] Failed to close agent file repository pool")
         app.state.redis_stream_client = None
         app.state.session_manager = None
+        app.state.blob_container_client = None
+        app.state.agent_file_repository = None
         logger.exception("[app.py] Failed to initialize stream redis client")
         raise RuntimeError("Stream Redis initialization failed") from exc
+    finally:
+        secret_client.close()
 
     # Yield to application
     try:
         yield
-    
+
     # Application Shutdown
     finally:
         redis_stream_client = getattr(app.state, "redis_stream_client", None)
+        blob_container_client = getattr(app.state, "blob_container_client", None)
+        agent_file_repository = getattr(app.state, "agent_file_repository", None)
         app.state.redis_stream_client = None
         app.state.session_manager = None
         app.state.runtime_config = None
+        app.state.blob_container_client = None
+        app.state.agent_file_repository = None
 
         if redis_stream_client is not None:
             await close_redis_client(redis_stream_client)
+        if blob_container_client is not None:
+            await blob_container_client.close()
+        if agent_file_repository is not None:
+            try:
+                await agent_file_repository.close()
+            except Exception:
+                logger.warning("[app.py] Failed to close agent file repository pool")
 
         logger.info("[app.py] Application shutdown")
 
@@ -78,6 +132,7 @@ def create_app() -> FastAPI:
         - /agent/api/ping: Liveness endpoint
         - /agent/api/health: Readiness endpoint
         - /agent/api/jobs: Async job endpoints
+        - /agent/api/files: File upload endpoint
         - /agent/swagger: Swagger UI
         - /agent/openapi.json: OpenAPI schema
     """
@@ -105,13 +160,16 @@ def create_app() -> FastAPI:
         )
 
         for path, path_item in schema.get("paths", {}).items():
-            if not path.startswith(JOB_PATH_PREFIX):
+            if not path.startswith(("/agent/api/jobs", "/agent/api/files")):
                 continue
             for operation in path_item.values():
                 if not isinstance(operation, dict):
                     continue
                 for parameter in operation.get("parameters", []):
-                    if parameter.get("in") == "header" and parameter.get("name") == "X-User-Id":
+                    if (
+                        parameter.get("in") == "header"
+                        and parameter.get("name") == "X-User-Id"
+                    ):
                         parameter["required"] = True
                         parameter["schema"] = {
                             "type": "string",
@@ -141,7 +199,7 @@ def create_app() -> FastAPI:
             swagger_favicon_url=request.url_for("static", path="favicon.png").path,
         )
 
-    # Swagger UI (OAuth2 Redirect) 
+    # Swagger UI (OAuth2 Redirect)
     @app.get("/agent/swagger/oauth2-redirect", include_in_schema=False)
     async def swagger_ui_redirect():
         return get_swagger_ui_oauth2_redirect_html()
@@ -167,5 +225,6 @@ def create_app() -> FastAPI:
     app.include_router(ping_router)
     app.include_router(health_router)
     app.include_router(job_router)
+    app.include_router(files_router)
 
     return app

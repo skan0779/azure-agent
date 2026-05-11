@@ -61,6 +61,34 @@ class ErrorResponse(BaseModel):
     )
 
 
+class FileRole(str, Enum):
+    upload = "upload"
+    artifact = "artifact"
+
+
+class FileUploadResponse(BaseModel):
+    file_id: UUID = Field(..., description="file ID")
+    thread_id: UUID = Field(..., description="thread/session ID")
+    role: FileRole = Field(..., description="file role")
+    filename: str = Field(..., description="original filename")
+    mime_type: str | None = Field(None, description="uploaded file MIME type")
+    size: int = Field(..., description="file size in bytes")
+    created_at: datetime = Field(..., description="timezone-aware UTC timestamp")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "file_id": "44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6",
+                "thread_id": "44dc72d6-7ba4-44e0-b8e8-0ba2fcb888a6",
+                "role": "upload",
+                "filename": "sales.xlsx",
+                "mime_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "size": 12345,
+                "created_at": "2026-05-07T10:00:00+00:00",
+            }
+        }
+    )
+
+
 class JobStatus(str, Enum):
     queued = "queued"
     running = "running"
@@ -109,8 +137,12 @@ class JobStatusResponse(BaseModel):
     thread_id: UUID = Field(..., description="thread/session ID")
     user_id: str = Field(..., description="user ID")
     created_at: datetime = Field(..., description="timezone-aware UTC timestamp")
-    started_at: datetime | None = Field(None, description="timezone-aware UTC timestamp")
-    finished_at: datetime | None = Field(None, description="timezone-aware UTC timestamp")
+    started_at: datetime | None = Field(
+        None, description="timezone-aware UTC timestamp"
+    )
+    finished_at: datetime | None = Field(
+        None, description="timezone-aware UTC timestamp"
+    )
     error: str | None = Field(None, description="error message if failed")
     metadata: dict[str, Any] | None = Field(None, description="optional metadata")
     model_config = ConfigDict(

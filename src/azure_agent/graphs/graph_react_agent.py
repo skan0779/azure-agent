@@ -34,10 +34,6 @@ from langmem import create_manage_memory_tool, create_search_memory_tool
 
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
-from azure_agent.middlewares.stream import (
-    event_stream_before_agent,
-    event_stream_before_model,
-)
 from azure_agent.middlewares.azure_ai_content_safety import (
     azure_content_moderation_middleware,
     azure_prompt_shield_middleware,

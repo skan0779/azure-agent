@@ -82,8 +82,7 @@ export const extractLastUserText = (messages: unknown[]): string | undefined => 
   return undefined;
 };
 
-export const createAutoThreadTitle = (text: string): string => {
-  const normalized = text.replace(/\s+/g, " ").trim();
+export const createAutoThreadTitle = (text: string): string => {  const normalized = text.replace(/\s+/g, " ").trim();
   if (!normalized) {
     return "New chat";
   }
@@ -94,6 +93,118 @@ export const createAutoThreadTitle = (text: string): string => {
   }
 
   return `${tokens.slice(0, AUTO_TITLE_TOKEN_LIMIT).join(" ")}...`;
+};
+
+export type AttachedFileRef = {
+  fileId: string;
+  filename: string;
+  mimeType?: string;
+  size?: number;
+};
+
+const toAttachedFileRef = (value: unknown): AttachedFileRef | null => {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const v = value as Record<string, unknown>;
+  const fileId =
+    typeof v.file_id === "string"
+      ? v.file_id
+      : typeof v.fileId === "string"
+        ? v.fileId
+        : "";
+  const filename = typeof v.filename === "string" ? v.filename : "";
+  if (!fileId || !filename) {
+    return null;
+  }
+  return {
+    fileId,
+    filename,
+    mimeType:
+      typeof v.mime_type === "string"
+        ? v.mime_type
+        : typeof v.mimeType === "string"
+          ? v.mimeType
+          : undefined,
+    size: typeof v.size === "number" ? v.size : undefined,
+  };
+};
+
+export const extractAttachedFilesFromMessage = (
+  message: unknown,
+): AttachedFileRef[] => {
+  if (!message || typeof message !== "object" || !("parts" in message)) {
+    return [];
+  }
+  const parts = (message as { parts?: unknown }).parts;
+  if (!Array.isArray(parts)) {
+    return [];
+  }
+
+  const refs = new Map<string, AttachedFileRef>();
+  for (const part of parts) {
+    if (!part || typeof part !== "object" || !("type" in part)) {
+      continue;
+    }
+    const p = part as Record<string, unknown>;
+    const partType = typeof p.type === "string" ? p.type : "";
+    let payload: unknown = null;
+
+    if (partType === "data-agent-file") {
+      payload = p.data;
+    } else if (
+      partType === "data" &&
+      typeof p.name === "string" &&
+      p.name === "agent-file"
+    ) {
+      payload = p.data;
+    }
+
+    const ref = toAttachedFileRef(payload);
+    if (ref && !refs.has(ref.fileId)) {
+      refs.set(ref.fileId, ref);
+    }
+  }
+
+  return [...refs.values()];
+};
+
+export const extractLastUserAttachments = (
+  messages: unknown[],
+): AttachedFileRef[] => {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || typeof message !== "object") {
+      continue;
+    }
+    const role =
+      "role" in message && typeof message.role === "string"
+        ? message.role
+        : "";
+    if (role !== "user") {
+      continue;
+    }
+    const refs = extractAttachedFilesFromMessage(message);
+    if (refs.length > 0) {
+      return refs;
+    }
+    return [];
+  }
+  return [];
+};
+
+export const composeUserQueryWithAttachments = (
+  text: string,
+  attachments: AttachedFileRef[],
+): string => {
+  if (attachments.length === 0) {
+    return text;
+  }
+  const list = attachments.map((file) => `- ${file.filename}`).join("\n");
+  const baseText = text.trim();
+  return baseText
+    ? `${baseText}\n\n[Attached files]\n${list}`
+    : `[Attached files]\n${list}`;
 };
 
 export const extractLastUserMessage = (

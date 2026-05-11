@@ -496,6 +496,7 @@ class JobWorker:
             cancelled_by_hook = False
             async for evt in self.agent.run_job(
                 thread_id=thread_id,
+                job_id=job_id,
                 user_id=user_id,
                 user_query=user_query,
                 cancel=_cancel_requested,
