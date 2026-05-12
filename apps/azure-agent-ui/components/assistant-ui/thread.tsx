@@ -327,10 +327,33 @@ const ThreadScrollToBottom: FC = () => {
 };
 
 const UserMessage: FC = () => {
+  // Live session: attachments come from message.attachments (rendered by
+  // MessagePrimitive.Attachments). After refresh: persisted attachments come
+  // back as data-agent-file / data-artifact parts inside message.content.
+  // Read them here so we can render the chip ABOVE the bubble in both cases.
+  const persistedAttachmentParts = useAuiState((s) =>
+    s.message.content.filter((part) => {
+      const name = getDataPartName(part);
+      return name === "agent-file" || name === "artifact";
+    }),
+  );
+
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col items-end gap-1">
       <div className="flex flex-row flex-wrap justify-end gap-2">
         <MessagePrimitive.Attachments components={{ Attachment: ChatGPTAttachmentUI }} />
+        {persistedAttachmentParts.map((part, index) => {
+          const id =
+            typeof (part as { id?: unknown }).id === "string"
+              ? (part as { id: string }).id
+              : `persisted-attachment-${index}`;
+          return (
+            <UserAttachmentChip
+              key={id}
+              data={(part as { data?: unknown }).data}
+            />
+          );
+        })}
       </div>
 
       <div className="flex items-start gap-4">
@@ -369,14 +392,8 @@ const UserMessage: FC = () => {
           <MessagePrimitive.Parts>
             {({ part }) => {
               if (part.type === "text") return <MarkdownText />;
-              const dataName = getDataPartName(part);
-              if (dataName === "agent-file" || dataName === "artifact") {
-                return (
-                  <UserAttachmentChip
-                    data={(part as { data?: unknown }).data}
-                  />
-                );
-              }
+              // Persisted attachment chips are rendered above the bubble
+              // via persistedAttachmentParts; skip them here.
               return null;
             }}
           </MessagePrimitive.Parts>
@@ -587,23 +604,26 @@ const UserAttachmentChip = ({ data }: { data: unknown }) => {
       : typeof payload.mimeType === "string"
         ? payload.mimeType
         : undefined;
-  const size =
-    typeof payload.size === "number" ? payload.size : null;
-  const sizeLabel = formatBytes(size);
-  const subtitle = [mimeType, sizeLabel].filter(Boolean).join(" · ");
+  const typeLabel = mimeType?.startsWith("image/")
+    ? "Image"
+    : mimeType?.startsWith("application/pdf") ||
+        mimeType?.startsWith("application/") ||
+        mimeType?.startsWith("text/")
+      ? "Document"
+      : "File";
 
   return (
-    <div className="mb-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#d8d8d8]">
-        <FileTextIcon className="size-5" />
+    <div className="flex max-w-[260px] items-center gap-3 rounded-2xl border border-[#e3dbcf] bg-[#f5f1eb] py-2 pr-3 pl-2 transition-colors hover:bg-[#efe8de] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10">
+      <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white text-[#6f675d] dark:bg-white/10 dark:text-[#cfcfcf]">
+        <FileTextIcon className="size-4" />
       </div>
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-medium text-sm text-[#f1f1f1]">
+      <div className="min-w-0">
+        <p className="truncate text-sm leading-5 text-[#2d2822] dark:text-[#f3efe9]">
           {filename}
-        </div>
-        {subtitle ? (
-          <div className="truncate text-xs text-[#9f9f9f]">{subtitle}</div>
-        ) : null}
+        </p>
+        <p className="text-xs text-[#7d7469] dark:text-[#9d968d]">
+          {typeLabel}
+        </p>
       </div>
     </div>
   );
