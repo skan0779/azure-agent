@@ -584,14 +584,19 @@ const ChatShellRuntime = ({
         onResolved={handleInitialThreadResolved}
       />
       <ThreadStoreSync />
-      <ChatShellLayout isInitialThreadResolved={isInitialThreadResolved} />
+      <ChatShellLayout
+        apiBaseUrl={apiBaseUrl}
+        isInitialThreadResolved={isInitialThreadResolved}
+      />
     </AssistantRuntimeProvider>
   );
 };
 
 const ChatShellLayout = ({
+  apiBaseUrl,
   isInitialThreadResolved,
 }: {
+  apiBaseUrl: string;
   isInitialThreadResolved: boolean;
 }) => {
   return (
@@ -607,7 +612,7 @@ const ChatShellLayout = ({
               Loading thread...
             </div>
           ) : (
-            <Assistant />
+            <Assistant apiBaseUrl={apiBaseUrl} userId={DEFAULT_USER_ID} />
           )}
         </main>
       </SidebarInset>

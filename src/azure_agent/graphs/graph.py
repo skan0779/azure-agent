@@ -201,7 +201,7 @@ class LangGraphProcess:
             container_name="files",
         )
         self.agent_file_repository = AgentFileRepository(
-            conn_string=secrets.POSTGRES_CONN_STRING,
+            conn_string=secrets.POSTGRES_WEB_CONN_STRING,
         )
 
 
@@ -508,7 +508,7 @@ class LangGraphProcess:
                 "country": "KR",
             },
         }
-        
+
         # Create Sandbox Agent
         sandbox_agent = create_deep_agent(
             model=self.main_model,
@@ -523,8 +523,8 @@ class LangGraphProcess:
                     file_repository=self.agent_file_repository,
                 )
             ],
-            skills=[],
-            memory=[],
+            # skills=[],
+            # memory=[],
             context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,
@@ -533,9 +533,7 @@ class LangGraphProcess:
                     pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
                     session_id=f"sandbox-{rt.context.user_id}-{rt.context.thread_id}",
                 ),
-                routes={
-                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", "sandbox", rt.context.user_id)),
-                },
+                routes={}
              ),
             name="sandbox_agent",
         )
@@ -572,12 +570,17 @@ class LangGraphProcess:
             subagents=[
                 CompiledSubAgent(
                     name="sandbox_agent",
-                    description="Uses an isolated workspace for computation, file processing, code execution, and data analysis.",
+                    description=(
+                        "Use for any task involving uploaded files, attachments, /mnt/data files, "
+                        "file conversion, file extraction, file editing, generated downloadable files, "
+                        "code execution, command-line work, computation, or data analysis. "
+                        "Uploaded user files are available only in this sandbox workspace."
+                    ),
                     runnable=sandbox_agent,
                 )
             ],
-            skills=[],
-            memory=[],
+            # skills=[],
+            # memory=[],
             context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,

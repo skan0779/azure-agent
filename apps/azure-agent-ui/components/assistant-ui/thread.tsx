@@ -13,7 +13,7 @@ import {
   useAuiState,
 } from "@assistant-ui/react";
 import type { FC } from "react";
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useShallow } from "zustand/shallow";
 import {
   ArrowDownIcon,
@@ -22,6 +22,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   CopyIcon,
+  DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
   LightbulbIcon,
@@ -96,14 +97,19 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
   };
 };
 
-export const Thread: FC = () => {
+type ThreadProps = {
+  apiBaseUrl: string;
+  userId: string;
+};
+
+export const Thread: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
       <AuiIf condition={(s) => s.thread.isEmpty}>
         <EmptyThreadView />
       </AuiIf>
       <AuiIf condition={(s) => !s.thread.isEmpty}>
-        <ConversationThreadView />
+        <ConversationThreadView apiBaseUrl={apiBaseUrl} userId={userId} />
       </AuiIf>
     </ThreadPrimitive.Root>
   );
@@ -161,11 +167,11 @@ const EmptySuggestionChip = ({
   );
 };
 
-const ConversationThreadView: FC = () => {
+const ConversationThreadView: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
   return (
     <ThreadPrimitive.Viewport className="aui-scrollbar flex grow flex-col gap-8 overflow-y-auto pt-16">
       <ThreadPrimitive.Messages>
-        {() => <ThreadMessage />}
+        {() => <ThreadMessage apiBaseUrl={apiBaseUrl} userId={userId} />}
       </ThreadPrimitive.Messages>
 
       <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 dark:bg-[#212121]">
@@ -201,7 +207,7 @@ const ComposerSendButton: FC<ComposerSendButtonProps> = ({
   );
 };
 
-const ThreadMessage: FC = () => {
+const ThreadMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
   const isEditing = useAuiState((s) => s.message.composer.isEditing);
   const role = useAuiState((s) => s.message.role);
 
@@ -213,7 +219,7 @@ const ThreadMessage: FC = () => {
     return <UserMessage />;
   }
 
-  return <AssistantMessage />;
+  return <AssistantMessage apiBaseUrl={apiBaseUrl} userId={userId} />;
 };
 
 const Composer: FC = () => {
@@ -382,7 +388,7 @@ const EditComposer: FC = () => {
   );
 };
 
-const AssistantMessage: FC = () => {
+const AssistantMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
   const messageContent = useAuiState((s) => s.message.content);
   const citations = useMemo(() => {
     return messageContent.flatMap((part): SerializableCitation[] => {
@@ -402,7 +408,13 @@ const AssistantMessage: FC = () => {
               if (part.type === "tool-call")
                 return part.toolUI ?? <ToolFallback {...part} />;
               if (part.type === "data" && part.name === "artifact")
-                return <ArtifactCard data={part.data} />;
+                return (
+                  <ArtifactCard
+                    apiBaseUrl={apiBaseUrl}
+                    data={part.data}
+                    userId={userId}
+                  />
+                );
               return null;
             }}
           </MessagePrimitive.Parts>
@@ -531,11 +543,13 @@ const formatBytes = (size: number | null | undefined): string => {
   return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unitIndex]}`;
 };
 
-const resolveArtifactHref = (downloadUrl: string | undefined): string => {
+const resolveArtifactHref = (
+  downloadUrl: string | undefined,
+  apiBaseUrl: string,
+): string => {
   if (!downloadUrl) return "#";
   if (/^https?:\/\//i.test(downloadUrl)) return downloadUrl;
-  const base =
-    process.env.NEXT_PUBLIC_AGENT_WEB_URL?.trim().replace(/\/$/, "") ?? "";
+  const base = apiBaseUrl.trim().replace(/\/$/, "");
   return `${base}${downloadUrl.startsWith("/") ? "" : "/"}${downloadUrl}`;
 };
 
@@ -578,10 +592,19 @@ const UserAttachmentChip = ({ data }: { data: unknown }) => {
   );
 };
 
-const ArtifactCard = ({ data }: { data: unknown }) => {
+const ArtifactCard = ({
+  apiBaseUrl,
+  data,
+  userId,
+}: {
+  apiBaseUrl: string;
+  data: unknown;
+  userId: string;
+}) => {
   if (!data || typeof data !== "object") {
     return null;
   }
+
   const payload = data as Record<string, unknown>;
   const filename =
     typeof payload.filename === "string" ? payload.filename : "Generated file";
@@ -601,17 +624,80 @@ const ArtifactCard = ({ data }: { data: unknown }) => {
       : typeof payload.download_url === "string"
         ? payload.download_url
         : undefined;
-  const href = resolveArtifactHref(downloadUrl);
-  const sizeLabel = formatBytes(size);
-  const subtitle = [mimeType, sizeLabel].filter(Boolean).join(" · ");
 
   return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      download={filename}
-      className="mt-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10"
+    <ArtifactDownloadCard
+      apiBaseUrl={apiBaseUrl}
+      downloadUrl={downloadUrl}
+      filename={filename}
+      mimeType={mimeType}
+      size={size}
+      userId={userId}
+    />
+  );
+};
+
+const ArtifactDownloadCard = ({
+  apiBaseUrl,
+  downloadUrl,
+  filename,
+  mimeType,
+  size,
+  userId,
+}: {
+  apiBaseUrl: string;
+  downloadUrl: string | undefined;
+  filename: string;
+  mimeType: string | undefined;
+  size: number | null;
+  userId: string;
+}) => {
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const href = resolveArtifactHref(downloadUrl, apiBaseUrl);
+  const sizeLabel = formatBytes(size);
+  const subtitle = [mimeType, sizeLabel].filter(Boolean).join(" · ");
+  const handleDownload = useCallback(async () => {
+    if (!downloadUrl || isDownloading) {
+      return;
+    }
+
+    setDownloadError(null);
+    setIsDownloading(true);
+    try {
+      const response = await fetch(href, {
+        headers: {
+          "X-User-Id": userId,
+        },
+      });
+      if (!response.ok) {
+        throw new Error(`Download failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = objectUrl;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+    } catch (error) {
+      setDownloadError(
+        error instanceof Error ? error.message : "Failed to download file",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [downloadUrl, filename, href, isDownloading, userId]);
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={!downloadUrl || isDownloading}
+      className="mt-2 flex w-full max-w-md items-center gap-3 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
     >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-[#d8d8d8]">
         <FileTextIcon className="size-5" />
@@ -623,9 +709,16 @@ const ArtifactCard = ({ data }: { data: unknown }) => {
         {subtitle ? (
           <div className="truncate text-xs text-[#9f9f9f]">{subtitle}</div>
         ) : null}
+        {downloadError ? (
+          <div className="truncate text-xs text-red-300">{downloadError}</div>
+        ) : null}
       </div>
-      <ExternalLinkIcon className="size-4 shrink-0 text-[#8f8f8f]" />
-    </a>
+      {isDownloading ? (
+        <LoaderIcon className="size-4 shrink-0 animate-spin text-[#8f8f8f]" />
+      ) : (
+        <DownloadIcon className="size-4 shrink-0 text-[#8f8f8f]" />
+      )}
+    </button>
   );
 };
 

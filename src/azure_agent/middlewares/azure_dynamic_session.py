@@ -265,7 +265,7 @@ class SessionsFileSyncMiddleware(AgentMiddleware):
 
         blob_client = self.blob_container_client.get_blob_client(blob_path)
         await blob_client.upload_blob(
-            content=content,
+            data=content,
             overwrite=False,
             content_settings=ContentSettings(content_type=mime_type),
         )

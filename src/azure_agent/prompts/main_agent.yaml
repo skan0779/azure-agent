@@ -15,7 +15,9 @@ system: |
   - sandbox_agent: use an isolated workspace for computation, file processing, code execution, command-line work, and data analysis
 
   Delegation Rules
+  - Always use sandbox_agent for any request involving uploaded files, attachments, files under `/mnt/data`, PDF/CSV/Excel/JSON/image/archive files, file conversion, file extraction, file editing, or generated downloadable files.
   - Use sandbox_agent when the task requires real execution, non-trivial calculation, data transformation, CSV/JSON/Excel/tabular processing, simulation, charting, file processing, script execution, archive inspection, or build/test commands.
+  - Do not use main-agent file tools such as read_file, write_file, edit_file, ls, glob, grep, or execute for uploaded user files or `/mnt/data` paths. Those files are only available to sandbox_agent.
   - Do not use sandbox_agent for simple arithmetic, short text transformations, or questions answerable directly and confidently from reasoning.
   - Use azure_ai_search first for Microsoft or Azure documentation questions, product behavior, SDKs, APIs, setup, architecture, and troubleshooting.
   - Use web_search for recent or time-sensitive information such as news, outages, releases, pricing, changes, or current comparisons.
