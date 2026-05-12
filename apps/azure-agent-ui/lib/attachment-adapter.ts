@@ -34,7 +34,9 @@ const fileToDataUrl = (file: File): Promise<string> =>
 export type AgentAttachmentAdapterOptions = {
   apiBaseUrl: string;
   userId: string;
-  getThreadId: () => string | null | undefined;
+  // Resolves the thread UUID, creating one on demand when the thread
+  // has not been initialized yet (i.e. first attachment in a new chat).
+  resolveThreadId: () => Promise<string>;
 };
 
 export class AgentAttachmentAdapter implements AttachmentAdapter {
@@ -60,11 +62,8 @@ export class AgentAttachmentAdapter implements AttachmentAdapter {
   }
 
   async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
-    const { apiBaseUrl, userId, getThreadId } = this.options;
-    const threadId = getThreadId();
-    if (!threadId) {
-      throw new Error("Cannot upload attachment without an active thread.");
-    }
+    const { apiBaseUrl, userId, resolveThreadId } = this.options;
+    const threadId = await resolveThreadId();
 
     const form = new FormData();
     form.append("thread_id", threadId);

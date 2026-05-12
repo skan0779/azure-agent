@@ -430,22 +430,23 @@ const useLocalChatThreadRuntime = ({
     });
   }, [apiBaseUrl, currentTitle, latestUserMessageId, latestUserText, remoteId, userId]);
 
-  const runtimeThreadKeyForUploadRef = useRef<string | null>(
-    runtimeThreadKey ?? null,
-  );
-
-  useEffect(() => {
-    runtimeThreadKeyForUploadRef.current = runtimeThreadKey ?? null;
-  }, [runtimeThreadKey]);
-
   const attachmentAdapter = useMemo(
     () =>
       new AgentAttachmentAdapter({
         apiBaseUrl,
         userId,
-        getThreadId: () => runtimeThreadKeyForUploadRef.current,
+        // Use the existing remoteId when available; otherwise initialize the
+        // thread on demand so the upload endpoint always receives a UUID.
+        resolveThreadId: async () => {
+          if (remoteIdRef.current) {
+            return remoteIdRef.current;
+          }
+          const result = await aui.threadListItem().initialize();
+          remoteIdRef.current = result.remoteId;
+          return result.remoteId;
+        },
       }),
-    [apiBaseUrl, userId],
+    [apiBaseUrl, userId, aui],
   );
 
   const runtime = useAISDKRuntime(

@@ -1,5 +1,6 @@
 import logging
 import re
+import unicodedata
 from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID, uuid4
@@ -26,12 +27,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+_UNSAFE_FILENAME_CHARS = re.compile(r"[\x00-\x1f/\\]")
+
 
 def sanitize_sandbox_filename(filename: str, *, max_length: int = 120) -> str:
-    filename = filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1].strip()
-    filename = re.sub(r"[^A-Za-z0-9._ -]+", "_", filename)
+    filename = filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    filename = unicodedata.normalize("NFC", filename)
+    filename = _UNSAFE_FILENAME_CHARS.sub("_", filename)
     filename = filename.strip(" .")
-    return filename[:max_length] or "file"
+    if filename in {"", ".", ".."}:
+        return "file"
+    encoded = filename.encode("utf-8")[:max_length]
+    return encoded.decode("utf-8", errors="ignore") or "file"
+
 
 
 def get_request_user_id(

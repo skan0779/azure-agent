@@ -179,6 +179,28 @@ const ConversationThreadView: FC = () => {
   );
 };
 
+type ComposerSendButtonProps = {
+  className: string;
+  children: React.ReactNode;
+};
+
+const ComposerSendButton: FC<ComposerSendButtonProps> = ({
+  className,
+  children,
+}) => {
+  // Disable Send when the user has not typed anything, even if attachments
+  // are present. The composer's built-in `isEmpty` would otherwise enable
+  // Send as soon as a file is attached.
+  const isTextEmpty = useAuiState(
+    (s) => s.composer.text.trim().length === 0,
+  );
+  return (
+    <ComposerPrimitive.Send disabled={isTextEmpty} className={className}>
+      {children}
+    </ComposerPrimitive.Send>
+  );
+};
+
 const ThreadMessage: FC = () => {
   const isEditing = useAuiState((s) => s.message.composer.isEditing);
   const role = useAuiState((s) => s.message.role);
@@ -214,9 +236,9 @@ const Composer: FC = () => {
         />
 
         <AuiIf condition={(s) => !s.thread.isRunning}>
-          <ComposerPrimitive.Send className="m-2 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-10 dark:bg-white dark:text-black">
+          <ComposerSendButton className="m-2 flex size-8 items-center justify-center rounded-full bg-primary text-primary-foreground transition-opacity disabled:opacity-10 dark:bg-white dark:text-black">
             <ArrowUpIcon className="size-5" />
-          </ComposerPrimitive.Send>
+          </ComposerSendButton>
         </AuiIf>
 
         <AuiIf condition={(s) => s.thread.isRunning}>
@@ -254,9 +276,9 @@ const EmptyComposer: FC = () => {
 
         <div className="flex items-center gap-2">
           <AuiIf condition={(s) => !s.thread.isRunning}>
-            <ComposerPrimitive.Send className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-opacity disabled:opacity-30">
+            <ComposerSendButton className="flex size-9 items-center justify-center rounded-full bg-white text-black transition-opacity disabled:opacity-30">
               <ArrowUpIcon className="size-4" />
-            </ComposerPrimitive.Send>
+            </ComposerSendButton>
           </AuiIf>
 
           <AuiIf condition={(s) => s.thread.isRunning}>
