@@ -331,11 +331,15 @@ const UserMessage: FC = () => {
   // MessagePrimitive.Attachments). After refresh: persisted attachments come
   // back as data-agent-file / data-artifact parts inside message.content.
   // Read them here so we can render the chip ABOVE the bubble in both cases.
-  const persistedAttachmentParts = useAuiState((s) =>
-    s.message.content.filter((part) => {
-      const name = getDataPartName(part);
-      return name === "agent-file" || name === "artifact";
-    }),
+  // NOTE: filter() returns a new array every call, so we must wrap the
+  // selector with useShallow to avoid Maximum-update-depth (React #185).
+  const persistedAttachmentParts = useAuiState(
+    useShallow((s) =>
+      s.message.content.filter((part) => {
+        const name = getDataPartName(part);
+        return name === "agent-file" || name === "artifact";
+      }),
+    ),
   );
 
   return (
