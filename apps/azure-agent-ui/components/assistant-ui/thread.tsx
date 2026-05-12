@@ -102,6 +102,21 @@ type ThreadProps = {
   userId: string;
 };
 
+// ai-sdk v6 / assistant-ui exposes data parts in two equivalent shapes:
+//   { type: "data", name: "agent-file", data }
+//   { type: "data-agent-file", data }
+// The persisted thread history uses the latter form, while live streaming
+// can produce either depending on the writer. This helper normalizes both.
+const getDataPartName = (part: unknown): string | undefined => {
+  if (!part || typeof part !== "object") return undefined;
+  const p = part as { type?: unknown; name?: unknown };
+  if (p.type === "data" && typeof p.name === "string") return p.name;
+  if (typeof p.type === "string" && p.type.startsWith("data-")) {
+    return p.type.slice(5);
+  }
+  return undefined;
+};
+
 export const Thread: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
@@ -354,11 +369,13 @@ const UserMessage: FC = () => {
           <MessagePrimitive.Parts>
             {({ part }) => {
               if (part.type === "text") return <MarkdownText />;
-              if (
-                part.type === "data" &&
-                (part.name === "agent-file" || part.name === "artifact")
-              ) {
-                return <UserAttachmentChip data={part.data} />;
+              const dataName = getDataPartName(part);
+              if (dataName === "agent-file" || dataName === "artifact") {
+                return (
+                  <UserAttachmentChip
+                    data={(part as { data?: unknown }).data}
+                  />
+                );
               }
               return null;
             }}
@@ -407,11 +424,11 @@ const AssistantMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
               if (part.type === "file") return <AssistantFilePart part={part} />;
               if (part.type === "tool-call")
                 return part.toolUI ?? <ToolFallback {...part} />;
-              if (part.type === "data" && part.name === "artifact")
+              if (getDataPartName(part) === "artifact")
                 return (
                   <ArtifactCard
                     apiBaseUrl={apiBaseUrl}
-                    data={part.data}
+                    data={(part as { data?: unknown }).data}
                     userId={userId}
                   />
                 );

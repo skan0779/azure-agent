@@ -757,7 +757,6 @@ export const buildChatRoutes = ({
                 parts: [
                   ...toolParts,
                   ...citationParts,
-                  ...artifactPartList,
                   ...(assistantText.trim()
                     ? [
                         {
@@ -767,6 +766,7 @@ export const buildChatRoutes = ({
                         },
                       ]
                     : []),
+                  ...artifactPartList,
                 ],
               },
             });

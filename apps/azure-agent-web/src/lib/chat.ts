@@ -259,10 +259,6 @@ export const extractLastUserMessage = (
 ): UIMessage | undefined => {
   for (let index = messages.length - 1; index >= 0; index -= 1) {
     const candidate = messages[index];
-    const parsed = uiMessageSchema.safeParse(candidate);
-    if (parsed.success && parsed.data.role === "user") {
-      return parsed.data;
-    }
 
     if (!candidate || typeof candidate !== "object") {
       continue;
@@ -276,22 +272,36 @@ export const extractLastUserMessage = (
       continue;
     }
 
+    const id =
+      "id" in candidate && typeof candidate.id === "string"
+        ? candidate.id
+        : randomUUID();
+    const attachedFiles = extractAttachedFilesFromMessage(candidate);
+    const attachmentParts = attachedFiles.map((file) => ({
+      type: "data-agent-file" as const,
+      id: file.fileId,
+      data: {
+        file_id: file.fileId,
+        filename: file.filename,
+        mime_type: file.mimeType,
+        size: file.size,
+      },
+    }));
+
     const content =
       "content" in candidate && typeof candidate.content === "string"
         ? candidate.content
         : undefined;
     if (content) {
       return {
-        id:
-          "id" in candidate && typeof candidate.id === "string"
-            ? candidate.id
-            : randomUUID(),
+        id,
         role: "user",
         parts: [
           {
             type: "text",
             text: content,
           },
+          ...attachmentParts,
         ],
       };
     }
@@ -306,16 +316,14 @@ export const extractLastUserMessage = (
     }
 
     return {
-      id:
-        "id" in candidate && typeof candidate.id === "string"
-          ? candidate.id
-          : randomUUID(),
+      id,
       role: "user",
       parts: [
         {
           type: "text",
           text,
         },
+        ...attachmentParts,
       ],
     };
   }
