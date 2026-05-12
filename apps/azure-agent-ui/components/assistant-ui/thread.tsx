@@ -700,6 +700,23 @@ const useAttachmentSrc = () => {
   return useFileSrc(file) ?? src;
 };
 
+const AttachmentTypeLabel: FC = () => {
+  const typeLabel = useAuiState((s) => {
+    switch (s.attachment.type) {
+      case "image":
+        return "Image";
+      case "document":
+        return "Document";
+      case "file":
+        return "File";
+      default:
+        return s.attachment.type;
+    }
+  });
+
+  return <span>{typeLabel}</span>;
+};
+
 const ChatGPTAttachmentUI: FC = () => {
   const aui = useAui();
   const isComposer = aui.attachment.source !== "message";
@@ -707,26 +724,27 @@ const ChatGPTAttachmentUI: FC = () => {
 
   return (
     <AttachmentPrimitive.Root className="group/attachment relative">
-      <div className="flex items-center gap-2 overflow-hidden rounded-2xl border bg-secondary dark:bg-white/5">
-        <AuiIf condition={(s) => s.attachment.type === "image"}>
+      <div className="flex max-w-[260px] items-center gap-3 rounded-2xl border border-[#e3dbcf] bg-[#f5f1eb] py-2 pr-3 pl-2 transition-colors hover:bg-[#efe8de] dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10">
+        <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white text-[#6f675d] dark:bg-white/10 dark:text-[#cfcfcf]">
           {src ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="size-32 rounded-md object-cover" alt="Attachment" src={src} />
+            <img src={src} alt="Attachment" className="size-full object-cover" />
           ) : (
-            <div className="flex h-full w-12 items-center justify-center rounded-md">
-              <AttachmentPrimitive.unstable_Thumb className="text-xs" />
-            </div>
+            <FileTextIcon className="size-4" />
           )}
-        </AuiIf>
-        <AuiIf condition={(s) => s.attachment.type !== "image"}>
-          <div className="flex h-full w-12 items-center justify-center rounded-[9px] bg-background text-[#6b6b6b] dark:bg-[#3a3a3a] dark:text-[#9a9a9a]">
-            <AttachmentPrimitive.unstable_Thumb className="text-xs" />
-          </div>
-        </AuiIf>
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm leading-5 text-[#2d2822] dark:text-[#f3efe9]">
+            <AttachmentPrimitive.Name />
+          </p>
+          <p className="text-xs text-[#7d7469] dark:text-[#9d968d]">
+            <AttachmentTypeLabel />
+          </p>
+        </div>
       </div>
       {isComposer && (
-        <AttachmentPrimitive.Remove className="absolute -top-1.5 -right-1.5 flex size-7 items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b6b6b] transition-all hover:bg-[#f5f5f5] hover:text-[#0d0d0d] dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:bg-[#252525] dark:hover:text-white">
-          <XIcon size={14} />
+        <AttachmentPrimitive.Remove className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-[#ede6dd] text-[#5f574d] opacity-0 transition-all hover:bg-[#dfd5c8] group-hover/attachment:opacity-100 dark:bg-white/15 dark:text-[#d4ccc2] dark:hover:bg-white/25">
+          <XIcon className="size-3" />
         </AttachmentPrimitive.Remove>
       )}
     </AttachmentPrimitive.Root>
