@@ -130,6 +130,51 @@ const toAttachedFileRef = (value: unknown): AttachedFileRef | null => {
   };
 };
 
+// Matches /api/files/<file_id>/download produced by the UI attachment adapter.
+const FILE_PART_URL_PATTERN = /\/api\/files\/([^/?#]+)\/download(?:[?#].*)?$/;
+
+const extractFileIdFromUrl = (url: string): string | null => {
+  const match = FILE_PART_URL_PATTERN.exec(url);
+  if (!match) return null;
+  try {
+    return decodeURIComponent(match[1] ?? "") || null;
+  } catch {
+    return match[1] ?? null;
+  }
+};
+
+const filePartToAttachedFile = (
+  part: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  // ai-sdk uses `url`, assistant-ui internal type uses `data`.
+  const rawUrl =
+    typeof part.url === "string"
+      ? part.url
+      : typeof part.data === "string"
+        ? part.data
+        : "";
+  if (!rawUrl) return null;
+
+  const fileId = extractFileIdFromUrl(rawUrl);
+  if (!fileId) return null;
+
+  const filename = typeof part.filename === "string" ? part.filename : "";
+  if (!filename) return null;
+
+  const mimeType =
+    typeof part.mediaType === "string"
+      ? part.mediaType
+      : typeof part.mimeType === "string"
+        ? part.mimeType
+        : undefined;
+
+  return {
+    file_id: fileId,
+    filename,
+    mime_type: mimeType,
+  };
+};
+
 export const extractAttachedFilesFromMessage = (
   message: unknown,
 ): AttachedFileRef[] => {
@@ -158,6 +203,8 @@ export const extractAttachedFilesFromMessage = (
       p.name === "agent-file"
     ) {
       payload = p.data;
+    } else if (partType === "file") {
+      payload = filePartToAttachedFile(p);
     }
 
     const ref = toAttachedFileRef(payload);

@@ -99,30 +99,33 @@ export class AgentAttachmentAdapter implements AttachmentAdapter {
       size: number;
     };
 
-    const meta = {
-      file_id: result.file_id,
-      filename: result.filename,
-      mime_type: result.mime_type,
-      size: result.size,
-    };
-
-    const isImage = (attachment.contentType ?? "").startsWith("image/");
+    const mimeType = result.mime_type ?? "application/octet-stream";
+    const isImage = mimeType.startsWith("image/");
     const dataUrl = isImage
       ? await fileToDataUrl(attachment.file).catch(() => "")
       : "";
 
+    // Backend resolves file_id from this URL path (see chat.ts).
+    const downloadUrl = `${apiBaseUrl}/api/files/${encodeURIComponent(result.file_id)}/download`;
+
     const content = isImage && dataUrl
       ? [
           { type: "image" as const, image: dataUrl, filename: result.filename },
-          { type: "data" as const, name: "agent-file", data: meta },
         ]
-      : [{ type: "data" as const, name: "agent-file", data: meta }];
+      : [
+          {
+            type: "file" as const,
+            filename: result.filename,
+            mimeType,
+            data: downloadUrl,
+          },
+        ];
 
     return {
       id: attachment.id,
       type: attachment.type,
       name: result.filename,
-      contentType: result.mime_type ?? attachment.contentType,
+      contentType: mimeType,
       content,
       status: { type: "complete" },
     };
