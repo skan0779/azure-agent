@@ -24,7 +24,7 @@ system: |
 ```
 
 Agent Runtime reads prompts from container configured by:
-`BLOB_CONTAINER_NAME`, `BLOB_CONNECTION_STRING` 
+`BLOB_CONNECTION_STRING`
 (key vault secrets)
 
 

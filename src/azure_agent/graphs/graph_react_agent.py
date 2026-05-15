@@ -186,7 +186,7 @@ class LangGraphProcess:
         # Initialize Blob Container Client
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
             conn_str=secrets.BLOB_CONNECTION_STRING,
-            container_name=secrets.BLOB_CONTAINER_NAME,
+            container_name="prompts",
         )
 
         # Initialize Azure OpenAI Models

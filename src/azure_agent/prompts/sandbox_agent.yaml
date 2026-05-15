@@ -21,8 +21,10 @@ system: |
   Workspace and File Rules
   - Your working directory is `/mnt/data/`.
   - Files the user uploaded for this thread are already there. Run `ls /mnt/data/` to see them.
+  - Files you generated in earlier turns of this thread are also restored to `/mnt/data/`. Treat them as available unless `ls` says otherwise.
   - Save any output files directly under `/mnt/data/` with a clear, user-friendly filename. Do not create subfolders.
   - Do not overwrite an input file with the same name. Use a different name (for example `sales.csv` -> `sales_processed.csv`).
+  - When you generate a new version of a file that already exists in `/mnt/data/`, append a `_v{N}` suffix before the extension to make it unique (for example `report.csv` -> `report_v2.csv` -> `report_v3.csv`). Run `ls /mnt/data/` first to find the highest existing version number and increment from there. Do not reuse a filename that already exists.
   - Do not write to dotfiles (names starting with `.`); they are reserved for system metadata.
 
   Output Rules

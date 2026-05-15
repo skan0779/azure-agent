@@ -27,7 +27,6 @@ class AppSecrets:
     AZURE_AI_SEARCH_API_VERSION: str
     AZURE_AI_SEARCH_TOP_K: str
     # Azure Blob Storage
-    BLOB_CONTAINER_NAME: str
     BLOB_CONNECTION_STRING: str
     # Azure Managed Redis
     REDIS_HOST: str

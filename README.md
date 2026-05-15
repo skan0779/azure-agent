@@ -1,7 +1,3 @@
-<!-- <p align="center">
-  <img src="/docs/icons/Azure-Agent.png" width="20%" alt="Azure Agent" />
-</p> -->
-
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
@@ -11,18 +7,7 @@
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2563EB.svg" alt="License"></a>
   <a href="https://github.com/skan0779/azure-agent/stargazers" target="_blank"><img src="https://img.shields.io/github/stars/skan0779/azure-agent?style=flat&color=1D4ED8" alt="GitHub Stars"></a>
-  <a href="https://www.python.org/" target="_blank"><img src="https://img.shields.io/badge/Python-306998?logo=python&logoColor=white" alt="Python"></a>
-  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
-  <img src="https://img.shields.io/badge/React-149ECA?logo=react&logoColor=white" alt="React">
-  <img src="https://img.shields.io/badge/Next.js-111111?logo=nextdotjs&logoColor=white" alt="Next.js">
-  <img src="https://img.shields.io/badge/LangGraph-1F2937?logo=langchain&logoColor=white" alt="LangGraph">
-  <img src="https://img.shields.io/badge/Redis-B91C1C?logo=redis&logoColor=white" alt="Redis">
-  <img src="https://img.shields.io/badge/PostgreSQL-1D4ED8?logo=postgresql&logoColor=white" alt="PostgreSQL">
-  <img src="https://img.shields.io/badge/FastAPI-0F766E?logo=fastapi&logoColor=white" alt="FastAPI">
-  <img src="https://img.shields.io/badge/Fastify-000000?logo=fastify&logoColor=white" alt="Fastify">
   <img src="https://img.shields.io/badge/Docker-2563EB?logo=docker&logoColor=white" alt="Docker">
-  <img src="https://img.shields.io/badge/PNPM-F69220?logo=pnpm&logoColor=white" alt="pnpm">
-  <img src="https://img.shields.io/badge/uv-7C3AED?logo=uv&logoColor=white" alt="uv">
 </p>
 
 <p align="center">
@@ -36,21 +21,21 @@
 
 | Resource | Notes |
 | --- | --- |
-| Azure OpenAI | Deploy `gpt-4o-mini`, `text-embedding-3-large` |
-| Azure AI Foundry | Deploy `model-router` |
+| Azure OpenAI | Deploy `gpt-5.4-nano`, `text-embedding-3-large` |
+| Azure AI Foundry | Deploy `gpt-5.4` |
 | Azure AI Search | [Create and Upload Document](./examples/azure_ai_search/README.md) |
 | Azure AI Content Safety | - |
 | Azure Managed Redis (Enterprise) | Required modules: `RedisJSON`, `RedisSearch` |
 | Azure Managed Redis (OSS) | - |
 | Azure Database for PostgreSQL | - |
-| Azure Storage Account (Blob) | - |
+| Azure Storage Account (Blob) | Create `files`, `prompts` container |
 | Azure Container Registry | - |
 | Azure Container Apps Environment | - |
 | Azure Container Apps | Deploy `azure-agent-api` service |
 | Azure Container Apps | Deploy `azure-agent-worker` service |
 | Azure Container Apps | Deploy `azure-agent-web` service |
 | Azure Static Web Apps | Deploy `azure-agent-ui` service |
-| Azure Container App Job | Trigger type: `Manual` |
+| Azure Container App Job | Trigger type: `Manual`, Run `azure-agent-job` |
 | Azure Container Apps Session Pool | Pool type: `Python` |
 | Azure Container Apps Session Pool | Pool type: `Shell` |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
@@ -96,7 +81,7 @@ az keyvault secret set \
 ### 5. Build and Push Docker Image to Azure Container Registry
 > For more details, see [`README.md`](./environments/deploy/README.md) and [`README.md`](./apps/README.md).
 
-Build and push `azure-agent-api`, `azure-agent-worker` docker image:
+Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image:
 ```bash
 az login
 
@@ -120,7 +105,21 @@ docker buildx build \
   --push .
 ```
 
-### 6. Deploy and Configure an Azure Container Apps
+### 6. Run Azure Container App Job
+
+Add a container `azure-agent-job`:
+- Image source: Azure Conatiner Registry
+- Managed identity: System assigned Identity (environment)
+- Command override: `sh`
+- Arguments override: `-lc, uv run --no-sync alembic upgrade head`
+- Application > Containers > Environment variables:
+```env
+KEY_VAULT_URL=<your-key-vault-url>
+```
+- Settings > Identity > System assigned: ✅
+- Settings > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+
+### 7. Deploy and Configure an Azure Container Apps
 > For more details, see [`README.md`](./environments/env/README.md).
 
 Deploy `azure-agent-api`:
@@ -176,7 +175,7 @@ HOST=0.0.0.0
 PORT=3001
 ```
 
-### 7. Deploy and Configure an Azure Static Web Apps
+### 8. Deploy and Configure an Azure Static Web Apps
 > For more details, see [`README.md`](./apps/README.md).
 
 Deploy `azure-agent-ui`:
@@ -192,7 +191,7 @@ Deploy `azure-agent-ui` via github workflow:
 git push origin main
 ```
 
-### 8. Check Service Status (optional)
+### 9. Check Service Status (optional)
 > For more details, see [`README.md`](./src/azure_agent/api/README.md).
 
 Check `azure-agent-api` status:

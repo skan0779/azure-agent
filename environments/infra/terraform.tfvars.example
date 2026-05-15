@@ -1,0 +1,130 @@
+# Azure Agent public-first Terraform template
+
+# Leave null to use ARM_SUBSCRIPTION_ID or the active Azure CLI subscription.
+subscription_id = null
+
+project_name = "azure-agent"
+environment  = "dev"
+location     = "koreacentral"
+
+# Optional. If empty, Terraform generates a stable random suffix in state.
+# Set this when you want predictable globally unique names.
+name_suffix = ""
+
+tags = {
+  Owner = "your-name@example.com"
+}
+
+# v1 quickstart mode:
+# - no VNet
+# - no private endpoints
+# - public Azure service endpoints
+public_network_access_enabled = true
+allowed_ip_ranges             = []
+
+log_analytics_retention_days = 30
+container_registry_sku       = "Basic"
+
+key_vault_sku_name                            = "standard"
+key_vault_soft_delete_retention_days          = 7
+key_vault_purge_protection_enabled            = false
+assign_current_user_key_vault_secrets_officer = true
+
+storage_account_replication_type          = "LRS"
+storage_blob_delete_retention_days        = 7
+storage_container_delete_retention_days   = 7
+
+search_sku             = "basic"
+search_replica_count   = 1
+search_partition_count = 1
+
+openai_sku_name           = "S0"
+create_openai_deployments = false
+openai_deployments = {
+  main = {
+    deployment_name = "gpt-5.4"
+    model_name      = "gpt-5.4"
+  }
+  small = {
+    deployment_name = "gpt-5.4-nano"
+    model_name      = "gpt-5.4-nano"
+  }
+  embedding = {
+    deployment_name = "text-embedding-3-large"
+    model_name      = "text-embedding-3-large"
+  }
+}
+
+content_safety_sku_name = "S0"
+
+redis_memory_sku_name                  = "Balanced_B0"
+redis_memory_high_availability_enabled = false
+redis_memory_eviction_policy           = "NoEviction"
+redis_memory_modules                   = ["RedisJSON", "RediSearch"]
+
+redis_stream_sku_name                  = "Balanced_B0"
+redis_stream_high_availability_enabled = false
+redis_stream_eviction_policy           = "NoEviction"
+
+postgres_version                          = "16"
+postgres_administrator_login              = "azureagent"
+postgres_administrator_password           = "CHANGE_ME_use_a_strong_password"
+postgres_sku_name                         = "B_Standard_B1ms"
+postgres_storage_mb                       = 32768
+postgres_backup_retention_days            = 7
+postgres_database_name                    = "azure_agent"
+postgres_web_database_name                = "azure_agent_web"
+postgres_allow_public_access_from_all_ips = true
+postgres_firewall_rules                   = {}
+
+static_web_app_location                     = "eastasia"
+static_web_app_sku_tier                     = "Free"
+static_web_app_sku_size                     = "Free"
+static_web_app_preview_environments_enabled = true
+
+session_pool_cooldown_period_seconds = 300
+session_pool_max_concurrent_sessions = 5
+session_pool_egress_enabled          = false
+
+deploy_container_apps    = false
+deploy_container_app_job = false
+
+api_min_replicas = 1
+api_max_replicas = 3
+api_cpu          = 0.5
+api_memory       = "1Gi"
+
+worker_min_replicas = 1
+worker_max_replicas = 3
+worker_cpu          = 0.5
+worker_memory       = "1Gi"
+
+web_min_replicas = 1
+web_max_replicas = 3
+web_cpu          = 0.5
+web_memory       = "1Gi"
+
+job_replica_timeout_in_seconds = 1800
+job_replica_retry_limit        = 1
+job_cpu                        = 0.5
+job_memory                     = "1Gi"
+
+sse_max_connection_seconds      = 600
+job_ttl_seconds                 = 86400
+event_ttl_seconds               = 86400
+idempotency_ttl_seconds         = 86400
+session_ttl_seconds             = 3600
+session_reservation_ttl_seconds = 300
+session_lock_ttl_seconds        = 90
+
+worker_heartbeat_interval_seconds = 15
+worker_pending_claim_idle_ms      = 300000
+worker_pending_claim_count        = 2
+worker_read_block_ms              = 10000
+worker_read_count                 = 1
+worker_extra_env                  = {}
+web_extra_env                     = {}
+
+# These tags are used later by Container Apps resources after you push images to ACR.
+api_worker_image_tag = "azure-agent:local"
+web_image_tag        = "azure-agent-web:local"

@@ -6,6 +6,7 @@ import {
   cancelAgentJob,
   cancelAgentJobById,
   createAgentJob,
+  type AgentEvent,
   type AgentJobCreateResponse,
   streamAgentEvents,
 } from "../lib/azure-agent-api.js";
@@ -38,6 +39,9 @@ const cancelBodySchema = z.object({
   jobId: z.string().min(1),
   userId: z.string().min(1).optional(),
 });
+
+const isSubgraphEvent = (event: AgentEvent): boolean =>
+  Array.isArray(event.ns) && event.ns.length > 0;
 
 const resolveUserId = ({
   bodyUserId,
@@ -534,6 +538,10 @@ export const buildChatRoutes = ({
                 continue;
               }
 
+              if (isSubgraphEvent(event)) {
+                continue;
+              }
+
               if (!textId) {
                 textId = crypto.randomUUID();
                 writer.write({
@@ -592,11 +600,6 @@ export const buildChatRoutes = ({
                   ...customData,
                   downloadUrl,
                 };
-                writer.write({
-                  type: "data-artifact",
-                  id: artifactPartId,
-                  data: artifactData,
-                });
                 artifactParts.set(artifactPartId, {
                   type: "data-artifact",
                   id: artifactPartId,
@@ -716,6 +719,10 @@ export const buildChatRoutes = ({
               type: "text-end",
               id: textId,
             });
+          }
+
+          for (const artifactPart of artifactParts.values()) {
+            writer.write(artifactPart);
           }
 
           const hasPersistableContent =

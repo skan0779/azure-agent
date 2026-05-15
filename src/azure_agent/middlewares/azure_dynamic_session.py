@@ -58,7 +58,6 @@ class SessionsFileSyncMiddleware(AgentMiddleware):
             user_id=context.user_id,
             thread_id=context.thread_id,
             session_marker=marker,
-            role="upload",
         )
         for file in pending:
             await self._hydrate_file(backend=backend, file=file)
@@ -258,7 +257,13 @@ class SessionsFileSyncMiddleware(AgentMiddleware):
             role="artifact",
             filename=original_filename,
         )
+        # Download the actual file at its current sandbox location first.
         content = await self._download_from_sandbox_path(backend, sandbox_path)
+        # When the filename was renamed to avoid collisions, also rewrite the
+        # tracked sandbox_path so the next session re-hydrates this artifact
+        # under its unique name (preserving previous versions).
+        if filename != original_filename:
+            sandbox_path = posixpath.join(posixpath.dirname(sandbox_path), filename)
         file_id = str(uuid4())
         blob_path = f"{user_id}/{thread_id}/artifacts/{job_id}/{file_id}"
         mime_type, _ = mimetypes.guess_type(filename)
