@@ -37,6 +37,6 @@ class AgentState(TypedDict, total=False):
 
 class UserProfile(BaseModel):
     name: Optional[str] = None
-    language: Optional[str] = "ko"
+    language: Optional[str] = None
     role: Optional[str] = None
     organization: Optional[str] = None

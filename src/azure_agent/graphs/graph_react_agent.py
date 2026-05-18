@@ -30,7 +30,7 @@ from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
 
 from langchain_community.vectorstores.azuresearch import AzureSearch
 
-from langmem import create_manage_memory_tool, create_search_memory_tool
+from langmem import create_manage_memory_tool, create_search_memory_tool, create_memory_store_manager
 
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
@@ -451,15 +451,41 @@ class LangGraphProcess:
 
         # Create Manage Memory Tool
         manage_memory = create_manage_memory_tool(
-            namespace=("memories", "{user_id}", "profile"),
+            namespace=("langmem", "{user_id}"),
             schema=UserProfile,
-            actions_permitted=("create", "update", "delete"),
+            actions_permitted=("create", "update"),
             name="manage_memory",
         )
 
+        # Create Memory Store Manager
+        memory_store_manager = create_memory_store_manager(
+            self.small_model,
+            namespace=("langmem", "{user_id}", "semantic"),
+            schemas=[UserProfile],
+            instructions=(
+                "Extract only durable, reusable long-term memories. "
+                "Do not store temporary task details, one-off requests, greetings, "
+                "small talk, or information useful only in the current thread. "
+                "If there is nothing worth remembering, make no changes."
+            ),
+            enable_inserts=True,
+            enable_deletes=True,
+            query_limit=5,
+            store=store,
+        )
+
+        # await memory_store_manager.ainvoke(
+        #     {
+        #         "messages": [
+        #             HumanMessage(content=user_query),
+        #         ]
+        #     },
+        #     config=config,
+        # )
+
         # Create Search Memory Tool
         search_memory = create_search_memory_tool(
-            namespace=("memories", "{user_id}"),
+            namespace=("langmem", "{user_id}"),
             name="search_memory",
         )
 

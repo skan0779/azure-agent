@@ -24,6 +24,7 @@ from langgraph.checkpoint.redis.ashallow import AsyncShallowRedisSaver
 from langgraph.store.postgres import AsyncPostgresStore, PoolConfig
 from deepagents import create_deep_agent, CompiledSubAgent
 from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
+from deepagents.backends.utils import create_file_data
 
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
@@ -556,7 +557,7 @@ class LangGraphProcess:
                 # PII Middleware
                 PIIMiddleware("email", strategy="mask"),
                 PIIMiddleware("credit_card", strategy="mask"),
-
+                
                 # Content Safety Middleware
                 azure_content_moderation_middleware(
                     endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
@@ -579,15 +580,20 @@ class LangGraphProcess:
                     runnable=sandbox_agent,
                 )
             ],
-            # skills=[],
-            # memory=[],
+            skills=[
+                # "/skills/",
+            ],
+            memory=[
+                "/memories/AGENTS.md",
+            ],
             context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,
-            backend=CompositeBackend(
-                default=StateBackend(),
+            backend=lambda rt: CompositeBackend(
+                default=StateBackend(rt),
                 routes={
-                    "/memories/": StoreBackend(namespace=lambda rt: ("memories", rt.context.user_id)),
+                    "/memories/": StoreBackend(rt, namespace=lambda rt: ("memories", rt.context.user_id)),
+                    # "/skills/": StoreBackend(rt, namespace=lambda rt: ("skills", "main_agent")),
                 },
             ),
             name="main_agent",
