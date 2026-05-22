@@ -1,4 +1,4 @@
-import asyncio, os, yaml, logging, inspect
+import asyncio, os, yaml, logging, inspect, base64
 from pathlib import Path
 from collections.abc import Awaitable, Callable
 
@@ -50,11 +50,9 @@ class LangGraphProcess:
     - Create Azure OpenAI models (main, small, embedding)
     - Create Azure AI Search vectorstore and retriever-backed tool
     - Create Redis Client
-    - Create Checkpointer (Shallow Redis)
+    - Create Checkpointer (Redis)
     - Create Store (Postgres)
     - Build Agent runnable
-    Args:
-        vault_url: Optional Azure Key Vault URL override
     """
     def __init__(self, vault_url: str | None = None) -> None:
         """
@@ -165,6 +163,12 @@ class LangGraphProcess:
             maybe = setup()
             if inspect.isawaitable(maybe):
                 await maybe
+
+        # Seed skills
+        await self._seed_skills(
+            agent_name="main_agent",
+            source_dir=Path(__file__).resolve().parents[1] / "skills" / "langchain-skills"
+        )
 
         # Load Prompt
         await self._load_prompts([
@@ -279,6 +283,58 @@ class LangGraphProcess:
 
             data = yaml.safe_load(raw)
             self.prompt_cache[file_name] = str(data["system"]).strip()
+
+    async def _seed_memories(self, user_id: str) -> None:
+        if self.store is None:
+            raise RuntimeError("Store is not initialized")
+
+        key = "/memories/AGENTS.md"
+        namespace = ("memories", user_id)
+
+        existing = await self.store.aget(namespace, key)
+        if existing is not None:
+            return
+
+        memory_path = Path(__file__).resolve().parents[1] / "memories" / "AGENTS.md"
+        initial_memory = await asyncio.to_thread(
+            memory_path.read_text,
+            encoding="utf-8",
+        )
+
+        await self.store.aput(
+            namespace,
+            key,
+            create_file_data(initial_memory),
+            index=False,
+        )
+
+    async def _seed_skills(self, agent_name: str, source_dir: Path) -> None:
+        if self.store is None:
+            raise RuntimeError("Store is not initialized")
+
+        namespace = ("skills", agent_name)
+
+        for path in source_dir.rglob("*"):
+            if not path.is_file():
+                continue
+
+            relative = path.relative_to(source_dir).as_posix()
+            key = f"/skills/{relative}"
+
+            raw = await asyncio.to_thread(path.read_bytes)
+            try:
+                content = raw.decode("utf-8")
+                file_data = create_file_data(content, encoding="utf-8")
+            except UnicodeDecodeError:
+                content = base64.standard_b64encode(raw).decode("ascii")
+                file_data = create_file_data(content, encoding="base64")
+
+            await self.store.aput(
+                namespace,
+                key,
+                file_data,
+                index=False,
+            )
 
     async def close(self) -> None:
         """
@@ -524,8 +580,6 @@ class LangGraphProcess:
                     file_repository=self.agent_file_repository,
                 )
             ],
-            # skills=[],
-            # memory=[],
             context_schema=AgentContext,
             checkpointer=checkpointer,
             store=store,
@@ -581,7 +635,7 @@ class LangGraphProcess:
                 )
             ],
             skills=[
-                # "/skills/",
+                "/skills/",
             ],
             memory=[
                 "/memories/AGENTS.md",
@@ -593,7 +647,7 @@ class LangGraphProcess:
                 default=StateBackend(rt),
                 routes={
                     "/memories/": StoreBackend(rt, namespace=lambda rt: ("memories", rt.context.user_id)),
-                    # "/skills/": StoreBackend(rt, namespace=lambda rt: ("skills", "main_agent")),
+                    "/skills/": StoreBackend(rt, namespace=lambda rt: ("skills", "main_agent")),
                 },
             ),
             name="main_agent",
@@ -646,6 +700,8 @@ class LangGraphProcess:
                 "user_id": user_id,
             },
         )
+
+        await self._seed_memories(user_id)
 
         # Stream Processing
         stream = self.graph.astream(
