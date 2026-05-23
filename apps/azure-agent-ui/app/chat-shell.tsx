@@ -30,7 +30,7 @@ import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 import { AgentAttachmentAdapter } from "@/lib/attachment-adapter";
 
-const DEFAULT_USER_ID = "1015520";
+const DEFAULT_USER_ID = "1015521";
 
 const getStoredActiveThreadId = () => {
   if (typeof window === "undefined") {
