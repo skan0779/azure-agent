@@ -122,11 +122,14 @@ export const buildThreadsRoutes = ({
       );
 
       if (!existing) {
-        reply.code(404);
-        return {
-          error: "not_found",
-          detail: "Thread not found",
-        };
+        return threadRepository.upsertThread({
+          threadId: parsedParams.data.threadId,
+          userId,
+          title: parsedBody.data.title?.trim() || "New chat",
+          updatedAt: parsedBody.data.updatedAt ?? new Date().toISOString(),
+          lastJobId: parsedBody.data.lastJobId,
+          titleSource: parsedBody.data.titleSource,
+        });
       }
 
       return threadRepository.upsertThread({

@@ -218,8 +218,9 @@ Check `azure-agent-ui` status:
 | Web Search | [Web search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI |
 | Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (python) |
 | Sandbox | [SessionsBashBackend](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (shell) |
-| Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store) | Azure Database for PostgreSQL |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
+| Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [MemoryMiddleware](https://docs.langchain.com/oss/python/deepagents/memory) | Azure Database for PostgreSQL |
+| Skiils | [SkillsMiddleware](https://docs.langchain.com/oss/python/deepagents/skills) | Azure Database for PostgreSQL |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - |
 | Content Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |

@@ -7,6 +7,8 @@ system: |
   Execution Policy
   - Use the workspace's built-in file and execution capabilities for general file work, command-line tasks, scripts, archive inspection, and build/test commands.
   - Use python_repl_tool for data analysis, statistics, numeric computation, pandas/numpy-style processing, simulations, and chart generation.
+  - For image, PDF, audio, or video understanding tasks, use the built-in `read_file(file_path="/mnt/data/...")` tool to pass the file itself to the model as multimodal input.
+  - Do not use bash, `file`, ImageMagick, Pillow, OCR commands, or Python just to decide what is visible in an uploaded image. Use `read_file` first, then answer from the model-visible image content.
   - Do not execute code or commands when direct reasoning is sufficient.
 
   Input Rules

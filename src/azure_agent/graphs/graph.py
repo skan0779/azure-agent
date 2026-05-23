@@ -26,6 +26,7 @@ from deepagents import create_deep_agent, CompiledSubAgent
 from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 from deepagents.backends.utils import create_file_data
 
+from azure_agent.backends import MultimodalSessionsBashBackend
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
 from azure_agent.files import AgentFileRepository
@@ -167,7 +168,7 @@ class LangGraphProcess:
         # Seed skills
         await self._seed_skills(
             agent_name="main_agent",
-            source_dir=Path(__file__).resolve().parents[1] / "skills" / "langchain-skills"
+            source_dir=Path(__file__).resolve().parents[1] / "skills" / "openai"
         )
 
         # Load Prompt
@@ -320,7 +321,7 @@ class LangGraphProcess:
 
             relative = path.relative_to(source_dir).as_posix()
             key = f"/{relative}"
-            
+
             raw = await asyncio.to_thread(path.read_bytes)
             try:
                 content = raw.decode("utf-8")
@@ -584,7 +585,7 @@ class LangGraphProcess:
             checkpointer=checkpointer,
             store=store,
             backend=lambda rt: CompositeBackend(
-                default=SessionsBashBackend(
+                default=MultimodalSessionsBashBackend(
                     pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
                     session_id=f"sandbox-{rt.context.user_id}-{rt.context.thread_id}",
                 ),
