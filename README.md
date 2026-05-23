@@ -126,6 +126,7 @@ Deploy `azure-agent-api`:
 - Target port : 8080
 - Security > Identity > System assigned: ✅
 - Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+- Application > Scale > Min replicas: 1
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>
@@ -144,6 +145,7 @@ Deploy `azure-agent-worker`:
 - Arguments override: `-lc, uv run azure-agent-worker`
 - Security > Identity > System assigned: ✅
 - Azure role assignments: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`, `Azure ContainerApps Session Executor`
+- Application > Scale > Min replicas: 1
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>
@@ -165,6 +167,7 @@ Deploy `azure-agent-web`:
 - Target port : 3001
 - Security > Identity > System assigned: ✅
 - Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+- Application > Scale > Min replicas: 1
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>

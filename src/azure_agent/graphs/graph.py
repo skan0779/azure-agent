@@ -288,8 +288,8 @@ class LangGraphProcess:
         if self.store is None:
             raise RuntimeError("Store is not initialized")
 
-        key = "/memories/AGENTS.md"
         namespace = ("memories", user_id)
+        key = "/AGENTS.md"
 
         existing = await self.store.aget(namespace, key)
         if existing is not None:
@@ -319,8 +319,8 @@ class LangGraphProcess:
                 continue
 
             relative = path.relative_to(source_dir).as_posix()
-            key = f"/skills/{relative}"
-
+            key = f"/{relative}"
+            
             raw = await asyncio.to_thread(path.read_bytes)
             try:
                 content = raw.decode("utf-8")
