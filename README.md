@@ -13,6 +13,19 @@
   <img src="./docs/video/video.gif" width="100%" alt="Azure Agent demo" />
 </p>
 
+## Architecture
+
+> [!NOTE]
+> This service consists of five deployment units: `azure-agent-ui`, `azure-agent-web`, `azure-agent-api`, `azure-agent-worker`, and `azure-agent-job`. The `ui` and `web` units provide the frontend-facing layer, while the `api` and `worker` units run the core AI agent runtime. `job` unit used for database migrations via Alembic.
+
+<p align="center">
+  <img src="./docs/diagram/Azure-Resource-Architecture.png"
+       alt="azure resource achitecture"
+       style="width: 100%; height: auto;">
+</p>
+
+---
+
 ## Quickstart
 > Required and optional steps to start the service.
 
@@ -209,50 +222,37 @@ Check `azure-agent-ui` status:
 
 ---
 
-## Agent Feature & Checklist
+## Agent Features
 > AI Agent Stack for Enterprise workloads on Microsoft Azure
 
 | Category | Library | Resource |
 | --- | --- | --- |
 | RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
 | Web Search | [Web search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI |
+| Sandbox Environment | [SessionsBashBackend](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (shell) |
 | Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (python) |
-| Sandbox | [SessionsBashBackend](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (shell) |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [MemoryMiddleware](https://docs.langchain.com/oss/python/deepagents/memory) | Azure Database for PostgreSQL |
 | Skiils | [SkillsMiddleware](https://docs.langchain.com/oss/python/deepagents/skills) | Azure Database for PostgreSQL |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
-| Rate Limiting | ModelCallLimitMiddleware, ToolCallLimitMiddleware | - |
+| Agent Orchestration | [SubAgentMiddleware](https://reference.langchain.com/python/deepagents/middleware/subagents/SubAgentMiddleware) | - |
+| Task Management | [TodoListMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/todo/TodoListMiddleware) | Azure Managed Redis (Enterprise) |
+| File Management | [FilesystemMiddleware](https://reference.langchain.com/python/deepagents/middleware/filesystem/FilesystemMiddleware) | Azure Database for PostgreSQL |
+| Rate Limiting | [ModelCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/model_call_limit/ModelCallLimitMiddleware), [ToolCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/tool_call_limit/ToolCallLimitMiddleware), .. | - |
 | Content Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | Prompt Sheild | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | PII | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | - |
-
-
-| Category | Library | Resource |
-| --- | --- | --- |
-| Job Queue & Worker | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
 | Session Management | [Session Manager(Custom)](./src/azure_agent/session/README.md) | Azure Managed Redis (OSS) |
-| Streaming | [LangGraph Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [FastAPI SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
-| Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
+| Stream Management(Job/Worker) | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
+| Real-time interaction | [Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
+| Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
 
 ---
 
-## Azure Resouece Architecture
-> 
-
-<p align="center">
-  <img src="./docs/diagram/Azure-Resource-Architecture.png"
-       alt="azure resource achitecture"
-       style="width: 100%; height: auto;">
-</p>
-
-
----
-
 ## License
-> This project is licensed under the `Apache License 2.0`. See [LICENSE](./LICENSE) for details.
+> This project is licensed under the [Apache License 2.0](./LICENSE).
 
-Bundled `Swagger UI assets` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
+Bundled `Swagger UI assets`, `OpenAI Skills` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.

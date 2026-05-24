@@ -8,13 +8,11 @@ from langchain_azure_dynamic_sessions.backends import SessionsBashBackend
 
 
 class MultimodalSessionsBashBackend(SessionsBashBackend):
-    """Azure Dynamic Sessions backend with DeepAgents multimodal reads.
-
-    The upstream SessionsBashBackend overrides read() with an awk-based text
-    reader. That is fine for text, but it prevents DeepAgents read_file from
-    returning image/PDF/audio/video content blocks to the model. For non-text
-    files, download the bytes from /mnt/data and return base64 FileData so
-    DeepAgents FilesystemMiddleware can build the multimodal ToolMessage.
+    """
+    Azure Dynamic Sessions backend with DeepAgents multimodal reads.
+    Overrides read() with an awk-based text reader. 
+    For non-text files, download the bytes from /mnt/data and return base64 FileData,
+    so filesystemMiddleware can build the multimodal ToolMessage.
     """
 
     max_multimodal_bytes = 20 * 1024 * 1024

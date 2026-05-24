@@ -627,7 +627,7 @@ class LangGraphProcess:
                 CompiledSubAgent(
                     name="sandbox_agent",
                     description=(
-                        "Use for any task involving uploaded files, attachments, /mnt/data files, "
+                        "Use for any task involving uploaded images, files, attachments, /mnt/data files, "
                         "file conversion, file extraction, file editing, generated downloadable files, "
                         "code execution, command-line work, computation, or data analysis. "
                         "Uploaded user files are available only in this sandbox workspace."
