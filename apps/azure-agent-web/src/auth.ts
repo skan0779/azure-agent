@@ -183,9 +183,12 @@ const hasRequiredScope = (claims: EntraAccessTokenClaims): boolean => {
 
 const validateClaims = (claims: EntraAccessTokenClaims): string | null => {
   const nowSeconds = Math.floor(Date.now() / 1000);
-  const expectedIssuer = `https://login.microsoftonline.com/${config.auth.tenantId}/v2.0`;
+  const expectedIssuers = new Set([
+    `https://login.microsoftonline.com/${config.auth.tenantId}/v2.0`,
+    `https://sts.windows.net/${config.auth.tenantId}/`,
+  ]);
 
-  if (!claims.iss || claims.iss !== expectedIssuer) {
+  if (!claims.iss || !expectedIssuers.has(claims.iss)) {
     return "invalid_issuer";
   }
 

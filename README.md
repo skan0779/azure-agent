@@ -50,6 +50,7 @@
 | Azure Container App Job | Trigger type: `Manual`, Run `azure-agent-job` |
 | Azure Container Apps Session Pool | Pool type: `Python` |
 | Azure Container Apps Session Pool | Pool type: `Shell` |
+| App Registrations | Register `azure-agent-ui`,`azure-agent-web-api` |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 
@@ -190,7 +191,39 @@ AZURE_AUTH_API_CLIENT_ID=<your-api-app-registration-client-id>
 AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 ```
 
-### 8. Deploy and Configure an Azure Static Web Apps
+### 8. Register App Registrations
+> Create Microsoft Entra App Registrations for `azure-agent-ui` sign-in and `azure-agent-web` JWT access token validation.
+
+1.1 Register `azure-agent-web-api`:
+- Name: azure-agent-web-api
+- Supported account types: Single tenant only
+
+1.2 Configure `azure-agent-web-api`:
+- Manage > Expose an API > Application ID URI: `add`
+- Manage > Expose an API > Add a scope : 
+```text
+`scope name`: access_as_user
+`Who can consent`: Admins and users 
+`Admin consent display name`: Access azure-agent API
+`Admin consent description`: Allows the app to access azure-agent API on behalf of the signed-in user.
+`User consent display name`: Access azure-agent API
+`User consent description`: Allows the app to access azure-agent API on your behalf.
+`State`: Enabled
+```
+
+2.1 Register `azure-agent-ui`:
+- Name: azure-agent-ui
+- Supported account types: Single tenant only
+- Redirect URI: https://<your-static-web-app-domain>
+
+2.2 Configure `azure-agent-ui`:
+- Manage > API Permissions > Add a permission > My APIs > `azure-agent-web-api`:
+```text
+`type of permissions`: Delegated permissions
+`permissions`: access_as_user
+```
+
+### 9. Deploy and Configure an Azure Static Web Apps
 > For more details, see [`README.md`](./apps/README.md).
 
 Deploy `azure-agent-ui`:
@@ -215,7 +248,7 @@ Deploy `azure-agent-ui` via github workflow:
 git push origin main
 ```
 
-### 9. Check Service Status (optional)
+### 10. Check Service Status (optional)
 > For more details, see [`README.md`](./src/azure_agent/api/README.md).
 
 Check `azure-agent-api` status:
@@ -256,6 +289,7 @@ Check `azure-agent-ui` status:
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
+| Authentication | [MSAL/JWT](https://learn.microsoft.com/ko-kr/entra/msal/python/) | Microsoft Entra ID, App Registration  |
 <!-- | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - | -->
 
 ---
