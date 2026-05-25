@@ -31,19 +31,40 @@ jobs:
           cache: pnpm
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Validate agent web URL
+      - name: Validate frontend configuration
         run: |
           if [ -z "${NEXT_PUBLIC_AGENT_WEB_URL}" ]; then
             echo "NEXT_PUBLIC_AGENT_WEB_URL is not set"
             exit 1
           fi
+          if [ -z "${NEXT_PUBLIC_AZURE_TENANT_ID}" ]; then
+            echo "NEXT_PUBLIC_AZURE_TENANT_ID is not set"
+            exit 1
+          fi
+          if [ -z "${NEXT_PUBLIC_AZURE_CLIENT_ID}" ]; then
+            echo "NEXT_PUBLIC_AZURE_CLIENT_ID is not set"
+            exit 1
+          fi
+          if [ -z "${NEXT_PUBLIC_AZURE_API_SCOPE}" ]; then
+            echo "NEXT_PUBLIC_AZURE_API_SCOPE is not set"
+            exit 1
+          fi
           echo "NEXT_PUBLIC_AGENT_WEB_URL=${NEXT_PUBLIC_AGENT_WEB_URL}"
+          echo "NEXT_PUBLIC_AZURE_TENANT_ID=${NEXT_PUBLIC_AZURE_TENANT_ID}"
+          echo "NEXT_PUBLIC_AZURE_CLIENT_ID=${NEXT_PUBLIC_AZURE_CLIENT_ID}"
+          echo "NEXT_PUBLIC_AZURE_API_SCOPE=${NEXT_PUBLIC_AZURE_API_SCOPE}"
         env:
           NEXT_PUBLIC_AGENT_WEB_URL: ${{ vars.NEXT_PUBLIC_AGENT_WEB_URL }}
+          NEXT_PUBLIC_AZURE_TENANT_ID: ${{ vars.NEXT_PUBLIC_AZURE_TENANT_ID }}
+          NEXT_PUBLIC_AZURE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_AZURE_CLIENT_ID }}
+          NEXT_PUBLIC_AZURE_API_SCOPE: ${{ vars.NEXT_PUBLIC_AZURE_API_SCOPE }}
       - name: Build azure-agent-ui
         run: pnpm --dir apps/azure-agent-ui build
         env:
           NEXT_PUBLIC_AGENT_WEB_URL: ${{ vars.NEXT_PUBLIC_AGENT_WEB_URL }}
+          NEXT_PUBLIC_AZURE_TENANT_ID: ${{ vars.NEXT_PUBLIC_AZURE_TENANT_ID }}
+          NEXT_PUBLIC_AZURE_CLIENT_ID: ${{ vars.NEXT_PUBLIC_AZURE_CLIENT_ID }}
+          NEXT_PUBLIC_AZURE_API_SCOPE: ${{ vars.NEXT_PUBLIC_AZURE_API_SCOPE }}
           IS_STATIC_EXPORT: true
       - name: Build And Deploy
         id: builddeploy
@@ -52,13 +73,10 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: "upload"
           skip_app_build: true
-          ###### Repository/Build Configurations - These values can be configured to match your app requirements. ######
-          # For more information regarding Static Web App workflow configurations, please visit: https://aka.ms/swaworkflowconfig
           app_location: "apps/azure-agent-ui/out" # Built app content path when skip_app_build is true
           api_location: "" # Api source code path - optional
           output_location: "" # Leave empty when skip_app_build is true
-          ###### End of Repository/Build Configurations ######
-
+          
   close_pull_request_job:
     if: github.event_name == 'pull_request' && github.event.action == 'closed'
     runs-on: ubuntu-latest
