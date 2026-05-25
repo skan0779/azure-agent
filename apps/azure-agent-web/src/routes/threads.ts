@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 
+import { getRequestUserId } from "../auth.js";
 import { deleteAgentThreadFiles } from "../lib/azure-agent-api.js";
 import { config } from "../config.js";
 import type { ThreadRepository } from "../lib/thread-repository.js";
@@ -9,12 +10,6 @@ import {
   listThreadsRoute,
   updateThreadRoute,
 } from "./threads.contract.js";
-
-const resolveUserId = (headerUserId: unknown) => {
-  return typeof headerUserId === "string" && headerUserId.trim()
-    ? headerUserId.trim()
-    : null;
-};
 
 export const buildThreadsRoutes = ({
   threadRepository,
@@ -31,12 +26,12 @@ export const buildThreadsRoutes = ({
         };
       }
 
-      const userId = resolveUserId(request.headers["x-user-id"]);
+      const userId = getRequestUserId(request);
       if (!userId) {
-        reply.code(400);
+        reply.code(401);
         return {
-          error: "invalid_request",
-          detail: "Missing X-User-Id header",
+          error: "missing_user_identity",
+          detail: "Authenticated user is required",
         };
       }
       const threads = await threadRepository.listThreadsForUser(userId);
@@ -63,12 +58,12 @@ export const buildThreadsRoutes = ({
         };
       }
 
-      const userId = resolveUserId(request.headers["x-user-id"]);
+      const userId = getRequestUserId(request);
       if (!userId) {
-        reply.code(400);
+        reply.code(401);
         return {
-          error: "invalid_request",
-          detail: "Missing X-User-Id header",
+          error: "missing_user_identity",
+          detail: "Authenticated user is required",
         };
       }
       const messages = await threadRepository.getThreadMessages({
@@ -108,12 +103,12 @@ export const buildThreadsRoutes = ({
         };
       }
 
-      const userId = resolveUserId(request.headers["x-user-id"]);
+      const userId = getRequestUserId(request);
       if (!userId) {
-        reply.code(400);
+        reply.code(401);
         return {
-          error: "invalid_request",
-          detail: "Missing X-User-Id header",
+          error: "missing_user_identity",
+          detail: "Authenticated user is required",
         };
       }
       const currentThreads = await threadRepository.listThreadsForUser(userId);
@@ -163,12 +158,12 @@ export const buildThreadsRoutes = ({
         };
       }
 
-      const userId = resolveUserId(request.headers["x-user-id"]);
+      const userId = getRequestUserId(request);
       if (!userId) {
-        reply.code(400);
+        reply.code(401);
         return {
-          error: "invalid_request",
-          detail: "Missing X-User-Id header",
+          error: "missing_user_identity",
+          detail: "Authenticated user is required",
         };
       }
 

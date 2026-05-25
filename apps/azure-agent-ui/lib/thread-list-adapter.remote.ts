@@ -5,6 +5,7 @@ import {
   listThreads,
   updateThread,
 } from "@/lib/thread-api";
+import type { AccessTokenProvider } from "@/lib/auth";
 
 type RemoteThreadInitializeResponse = {
   remoteId: string;
@@ -47,7 +48,7 @@ export class RemoteApiThreadListAdapter implements RemoteThreadListAdapter {
   constructor(
     private readonly options: {
       apiBaseUrl: string;
-      userId: string;
+      getAccessToken: AccessTokenProvider;
     },
   ) {}
 

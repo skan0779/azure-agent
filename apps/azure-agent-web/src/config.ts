@@ -14,6 +14,17 @@ const splitCsv = (value: string | undefined): string[] => {
     .filter(Boolean);
 };
 
+const splitOptionalCsv = (value: string | undefined): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
 const matchesOriginPattern = (origin: string, pattern: string) => {
   if (pattern === "*") {
     return true;
@@ -39,6 +50,10 @@ const matchesOriginPattern = (origin: string, pattern: string) => {
 };
 
 const corsOrigins = splitCsv(process.env.CORS_ORIGINS);
+const authAudiences = splitOptionalCsv(process.env.AZURE_AUTH_AUDIENCES);
+const azureAuthTenantId = process.env.AZURE_AUTH_TENANT_ID?.trim();
+const azureAuthApiClientId = process.env.AZURE_AUTH_API_CLIENT_ID?.trim();
+const isAzureAuthConfigured = Boolean(azureAuthTenantId && azureAuthApiClientId);
 
 export const config = {
   host: process.env.HOST ?? "0.0.0.0",
@@ -47,6 +62,18 @@ export const config = {
   agentApiBaseUrl:
     process.env.AGENT_API_BASE_URL ?? "http://127.0.0.1:8080",
   keyVaultUrl: process.env.KEY_VAULT_URL?.trim(),
+  auth: {
+    tenantId: azureAuthTenantId,
+    apiClientId: azureAuthApiClientId,
+    audiences: isAzureAuthConfigured
+      ? [
+          ...authAudiences,
+          azureAuthApiClientId,
+          `api://${azureAuthApiClientId}`,
+        ].filter((value, index, values) => values.indexOf(value) === index)
+      : authAudiences,
+    requiredScope: process.env.AZURE_AUTH_REQUIRED_SCOPE?.trim() ?? "access_as_user",
+  },
   isCorsOriginAllowed(origin: string | undefined) {
     if (!origin) {
       return false;

@@ -44,6 +44,7 @@ import {
   CitationList,
   type SerializableCitation,
 } from "@/components/tool-ui/citation/index";
+import { buildBearerHeaders, type AccessTokenProvider } from "@/lib/auth";
 
 const toSerializableCitation = (part: unknown): SerializableCitation | null => {
   if (!part || typeof part !== "object") {
@@ -99,7 +100,7 @@ const toSerializableCitation = (part: unknown): SerializableCitation | null => {
 
 type ThreadProps = {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
 };
 
 // ai-sdk v6 / assistant-ui exposes data parts in two equivalent shapes:
@@ -117,14 +118,17 @@ const getDataPartName = (part: unknown): string | undefined => {
   return undefined;
 };
 
-export const Thread: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
+export const Thread: FC<ThreadProps> = ({ apiBaseUrl, getAccessToken }) => {
   return (
     <ThreadPrimitive.Root className="flex h-full flex-col items-stretch bg-background px-4 text-foreground dark:bg-[#212121] dark:text-foreground">
       <AuiIf condition={(s) => s.thread.isEmpty}>
         <EmptyThreadView />
       </AuiIf>
       <AuiIf condition={(s) => !s.thread.isEmpty}>
-        <ConversationThreadView apiBaseUrl={apiBaseUrl} userId={userId} />
+        <ConversationThreadView
+          apiBaseUrl={apiBaseUrl}
+          getAccessToken={getAccessToken}
+        />
       </AuiIf>
     </ThreadPrimitive.Root>
   );
@@ -182,11 +186,19 @@ const EmptySuggestionChip = ({
   );
 };
 
-const ConversationThreadView: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
+const ConversationThreadView: FC<ThreadProps> = ({
+  apiBaseUrl,
+  getAccessToken,
+}) => {
   return (
     <ThreadPrimitive.Viewport className="aui-scrollbar flex grow flex-col gap-8 overflow-y-auto pt-16">
       <ThreadPrimitive.Messages>
-        {() => <ThreadMessage apiBaseUrl={apiBaseUrl} userId={userId} />}
+        {() => (
+          <ThreadMessage
+            apiBaseUrl={apiBaseUrl}
+            getAccessToken={getAccessToken}
+          />
+        )}
       </ThreadPrimitive.Messages>
 
       <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-4 overflow-visible rounded-t-3xl bg-background pb-2 dark:bg-[#212121]">
@@ -222,7 +234,7 @@ const ComposerSendButton: FC<ComposerSendButtonProps> = ({
   );
 };
 
-const ThreadMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
+const ThreadMessage: FC<ThreadProps> = ({ apiBaseUrl, getAccessToken }) => {
   const isEditing = useAuiState((s) => s.message.composer.isEditing);
   const role = useAuiState((s) => s.message.role);
 
@@ -234,7 +246,9 @@ const ThreadMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
     return <UserMessage />;
   }
 
-  return <AssistantMessage apiBaseUrl={apiBaseUrl} userId={userId} />;
+  return (
+    <AssistantMessage apiBaseUrl={apiBaseUrl} getAccessToken={getAccessToken} />
+  );
 };
 
 const Composer: FC = () => {
@@ -426,7 +440,7 @@ const EditComposer: FC = () => {
   );
 };
 
-const AssistantMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
+const AssistantMessage: FC<ThreadProps> = ({ apiBaseUrl, getAccessToken }) => {
   const messageContent = useAuiState((s) => s.message.content);
   const citations = useMemo(() => {
     return messageContent.flatMap((part): SerializableCitation[] => {
@@ -450,7 +464,7 @@ const AssistantMessage: FC<ThreadProps> = ({ apiBaseUrl, userId }) => {
                   <ArtifactCard
                     apiBaseUrl={apiBaseUrl}
                     data={(part as { data?: unknown }).data}
-                    userId={userId}
+                    getAccessToken={getAccessToken}
                   />
                 );
               return null;
@@ -636,11 +650,11 @@ const UserAttachmentChip = ({ data }: { data: unknown }) => {
 const ArtifactCard = ({
   apiBaseUrl,
   data,
-  userId,
+  getAccessToken,
 }: {
   apiBaseUrl: string;
   data: unknown;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
 }) => {
   if (!data || typeof data !== "object") {
     return null;
@@ -673,7 +687,7 @@ const ArtifactCard = ({
       filename={filename}
       mimeType={mimeType}
       size={size}
-      userId={userId}
+      getAccessToken={getAccessToken}
     />
   );
 };
@@ -684,14 +698,14 @@ const ArtifactDownloadCard = ({
   filename,
   mimeType,
   size,
-  userId,
+  getAccessToken,
 }: {
   apiBaseUrl: string;
   downloadUrl: string | undefined;
   filename: string;
   mimeType: string | undefined;
   size: number | null;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -707,9 +721,7 @@ const ArtifactDownloadCard = ({
     setIsDownloading(true);
     try {
       const response = await fetch(href, {
-        headers: {
-          "X-User-Id": userId,
-        },
+        headers: await buildBearerHeaders(getAccessToken),
       });
       if (!response.ok) {
         throw new Error(`Download failed with status ${response.status}`);
@@ -731,7 +743,7 @@ const ArtifactDownloadCard = ({
     } finally {
       setIsDownloading(false);
     }
-  }, [downloadUrl, filename, href, isDownloading, userId]);
+  }, [downloadUrl, filename, getAccessToken, href, isDownloading]);
 
   return (
     <button

@@ -64,26 +64,23 @@ uv run python examples/azure_ai_search/create_document.py
 ```
 
 ### 3. Upload prompt files to Azure Blob Storage (optional)
-> This repository provides an example system prompt, [`example.yaml`](./src/azure_agent/prompts/example.yaml). If no prompt files are found in Azure Blob Storage, the application uses the local `example.yaml` file as a fallback. For production use, replace it with your own system prompt. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
+> This repository provides an example system prompts in `/src/azure_agent/prompts/`. For production use, replace it with your own system prompt. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
 
-Upload prompt file to blob
+Upload prompt files to blob
 ```bash
 az storage blob upload \
   --connection-string "<your-blob-connection-string>" \
   --container-name "<your-blob-container-name>" \
-  --file src/azure_agent/prompts/example.yaml \
-  --name example.yaml \
+  --file src/azure_agent/prompts/main_agent.yaml \
+  --name main_agent.yaml \
   --overwrite
 ```
 
 ### 4. Configure an Azure Key Vault Secrets
 > Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. For more details, see [`README.md`](./environments/env/README.md).
 
-
 Set the Key Vault Secrets:
 ```bash
-az login
-
 az keyvault secret set \
   --vault-name "<your-key-vault-name>" \
   --name "<secret-name>" \
@@ -91,7 +88,7 @@ az keyvault secret set \
 ```
 
 ### 5. Build and Push Docker Image to Azure Container Registry
-> For more details, see [`README.md`](./environments/deploy/README.md) and [`README.md`](./apps/README.md).
+> For more details, see [`README.md`](./environments/deploy/README.md).
 
 Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image:
 ```bash
@@ -188,6 +185,9 @@ AGENT_API_BASE_URL=<your-azure-agent-api-url>
 CORS_ORIGINS=https://<your-static-web-app-domain>
 HOST=0.0.0.0
 PORT=3001
+AZURE_AUTH_TENANT_ID=<your-directory-tenant-id>
+AZURE_AUTH_API_CLIENT_ID=<your-api-app-registration-client-id>
+AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 ```
 
 ### 8. Deploy and Configure an Azure Static Web Apps
@@ -198,8 +198,17 @@ Deploy `azure-agent-ui`:
 - Deployment authorization policy: Deployment Token
 
 Setting Github Actions (Github Repository > Settings > Secrets and variables > Actions):
-- New repository secret: `AZURE_STATIC_WEB_APPS_API_TOKEN`: `azure-agent-ui` Deployment Token
-- New repository variables: `NEXT_PUBLIC_AGENT_WEB_URL`: `azure-agent-web` Application Url
+- New repository secret: 
+```env
+AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
+```
+- New repository variables:
+```env
+NEXT_PUBLIC_AGENT_WEB_URL=<azure-agent-web-application-url>
+NEXT_PUBLIC_AZURE_TENANT_ID=<your-directory-tenant-id>
+NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
+NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
+```
 
 Deploy `azure-agent-ui` via github workflow:
 ```bash
@@ -223,7 +232,6 @@ Check `azure-agent-ui` status:
 ---
 
 ## Agent Features
-> AI Agent Stack for Enterprise workloads on Microsoft Azure
 
 | Category | Library | Resource |
 | --- | --- | --- |
@@ -247,12 +255,12 @@ Check `azure-agent-ui` status:
 | Real-time interaction | [Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
-| Observability | [Langfuse](https://github.com/langfuse/langfuse) | - |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
+<!-- | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - | -->
 
 ---
 
 ## License
-> This project is licensed under the [Apache License 2.0](./LICENSE).
+> This project is licensed under the Apache License 2.0 [LICENSE](./LICENSE).
 
-Bundled `Swagger UI assets`, `OpenAI Skills` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
+Bundled `Swagger UI assets`, `OpenAI Skills`, `MS Learn Documents` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.

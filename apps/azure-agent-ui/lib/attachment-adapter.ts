@@ -4,6 +4,8 @@ import type {
   PendingAttachment,
 } from "@assistant-ui/react";
 
+import { buildBearerHeaders, type AccessTokenProvider } from "@/lib/auth";
+
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
 
 const inferAttachmentKind = (
@@ -33,7 +35,7 @@ const fileToDataUrl = (file: File): Promise<string> =>
 
 export type AgentAttachmentAdapterOptions = {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
   // Resolves the thread UUID, creating one on demand when the thread
   // has not been initialized yet (i.e. first attachment in a new chat).
   resolveThreadId: () => Promise<string>;
@@ -62,7 +64,7 @@ export class AgentAttachmentAdapter implements AttachmentAdapter {
   }
 
   async send(attachment: PendingAttachment): Promise<CompleteAttachment> {
-    const { apiBaseUrl, userId, resolveThreadId } = this.options;
+    const { apiBaseUrl, getAccessToken, resolveThreadId } = this.options;
     const threadId = await resolveThreadId();
 
     const form = new FormData();
@@ -71,9 +73,7 @@ export class AgentAttachmentAdapter implements AttachmentAdapter {
 
     const response = await fetch(`${apiBaseUrl}/api/files`, {
       method: "POST",
-      headers: {
-        "X-User-Id": userId,
-      },
+      headers: await buildBearerHeaders(getAccessToken),
       body: form,
     });
 

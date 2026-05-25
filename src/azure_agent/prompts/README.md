@@ -16,16 +16,13 @@
 At startup, the runtime loads prompt files from Azure Blob Storage first.
 If Blob loading fails, it falls back to the local file under `src/azure_agent/prompts/`.
 
-
 Prompt must be valid YAML files:
 ```yaml
 system: |
   You are a helpful assistant.
 ```
 
-Agent Runtime reads prompts from container configured by:
-`BLOB_CONNECTION_STRING`
-(key vault secrets)
+Agent Runtime reads prompts from container configured by: `BLOB_CONNECTION_STRING`
 
 
 ## Notes

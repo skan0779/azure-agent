@@ -1,6 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 
+import { registerAuth } from "./auth.js";
 import { config } from "./config.js";
 import { buildChatRoutes } from "./routes/chat.js";
 import { filesRoutes } from "./routes/files.js";
@@ -27,9 +28,11 @@ export const buildApp = ({
       callback(null, false);
     },
     credentials: true,
-    allowedHeaders: ["Content-Type", "X-User-Id"],
+    allowedHeaders: ["Authorization", "Content-Type"],
     methods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
   });
+
+  registerAuth(app);
 
   void app.register(healthRoutes);
   void app.register(filesRoutes);

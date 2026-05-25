@@ -59,6 +59,9 @@ Application:
 KEY_VAULT_URL=<your-key-vault-url>
 AGENT_API_BASE_URL=<your-azure-agent-api-url>
 CORS_ORIGINS=https://<your-static-web-app-domain>
+AZURE_AUTH_TENANT_ID=<directory-tenant-id>
+AZURE_AUTH_API_CLIENT_ID=<azure-agent-web-api-application-client-id>
+AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 HOST=0.0.0.0
 PORT=3001
 ```
@@ -71,6 +74,9 @@ New repository secret:
 
 New repository variables:
 `NEXT_PUBLIC_AGENT_WEB_URL`: Azure Container App Application Url (azure-agent-web)
+`NEXT_PUBLIC_AZURE_TENANT_ID`: Directory tenant ID
+`NEXT_PUBLIC_AZURE_CLIENT_ID`: azure-agent-ui Application client ID
+`NEXT_PUBLIC_AZURE_API_SCOPE`: `api://<azure-agent-web-api-application-client-id>/access_as_user`
 
 ### 6. Deploy UI via Github Actions
 > deploy `azure-agent-ui` via github workflow

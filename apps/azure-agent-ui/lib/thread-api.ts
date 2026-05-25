@@ -1,11 +1,12 @@
 import type { UIMessage } from "ai";
 
+import { buildBearerHeaders, type AccessTokenProvider } from "@/lib/auth";
 import type { ThreadSummary, ThreadTitleSource } from "@/lib/thread-store";
 
-const buildHeaders = (userId: string) => ({
-  "Content-Type": "application/json",
-  "X-User-Id": userId,
-});
+const buildJsonHeaders = (getAccessToken: AccessTokenProvider) =>
+  buildBearerHeaders(getAccessToken, {
+    "Content-Type": "application/json",
+  });
 
 const parseError = async (response: Response) => {
   try {
@@ -25,15 +26,13 @@ const parseError = async (response: Response) => {
 
 export const listThreads = async ({
   apiBaseUrl,
-  userId,
+  getAccessToken,
 }: {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
 }): Promise<ThreadSummary[]> => {
   const response = await fetch(`${apiBaseUrl}/api/threads`, {
-    headers: {
-      "X-User-Id": userId,
-    },
+    headers: await buildBearerHeaders(getAccessToken),
   });
 
   if (!response.ok) {
@@ -45,7 +44,7 @@ export const listThreads = async ({
 
 export const updateThread = async ({
   apiBaseUrl,
-  userId,
+  getAccessToken,
   threadId,
   title,
   titleSource,
@@ -53,7 +52,7 @@ export const updateThread = async ({
   lastJobId,
 }: {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
   threadId: string;
   title?: string;
   titleSource?: ThreadTitleSource;
@@ -64,7 +63,7 @@ export const updateThread = async ({
     `${apiBaseUrl}/api/threads/${encodeURIComponent(threadId)}`,
     {
       method: "PATCH",
-      headers: buildHeaders(userId),
+      headers: await buildJsonHeaders(getAccessToken),
       body: JSON.stringify({
         title,
         titleSource,
@@ -83,20 +82,18 @@ export const updateThread = async ({
 
 export const deleteThread = async ({
   apiBaseUrl,
-  userId,
+  getAccessToken,
   threadId,
 }: {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
   threadId: string;
 }): Promise<void> => {
   const response = await fetch(
     `${apiBaseUrl}/api/threads/${encodeURIComponent(threadId)}`,
     {
       method: "DELETE",
-      headers: {
-        "X-User-Id": userId,
-      },
+      headers: await buildBearerHeaders(getAccessToken),
     },
   );
 
@@ -107,19 +104,17 @@ export const deleteThread = async ({
 
 export const getThreadMessages = async ({
   apiBaseUrl,
-  userId,
+  getAccessToken,
   threadId,
 }: {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
   threadId: string;
 }): Promise<UIMessage[]> => {
   const response = await fetch(
     `${apiBaseUrl}/api/threads/${encodeURIComponent(threadId)}/messages`,
     {
-      headers: {
-        "X-User-Id": userId,
-      },
+      headers: await buildBearerHeaders(getAccessToken),
     },
   );
 

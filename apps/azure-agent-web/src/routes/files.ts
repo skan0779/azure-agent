@@ -2,6 +2,7 @@ import multipart from "@fastify/multipart";
 import type { FastifyPluginAsync } from "fastify";
 import { Readable } from "node:stream";
 
+import { getRequestUserId } from "../auth.js";
 import {
   downloadAgentFile,
   uploadAgentFile,
@@ -9,14 +10,6 @@ import {
 import { config } from "../config.js";
 
 const MAX_UPLOAD_SIZE_BYTES = 25 * 1024 * 1024;
-
-const resolveUserId = (
-  bodyUserId: string | undefined,
-  headerUserId: string | undefined,
-): string | null => {
-  const resolved = bodyUserId?.trim() || headerUserId?.trim();
-  return resolved || null;
-};
 
 export const filesRoutes: FastifyPluginAsync = async (app) => {
   await app.register(multipart, {
@@ -27,17 +20,12 @@ export const filesRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/api/files", async (request, reply) => {
-    const headerUserId =
-      typeof request.headers["x-user-id"] === "string"
-        ? request.headers["x-user-id"]
-        : undefined;
-
-    const userId = resolveUserId(undefined, headerUserId);
+    const userId = getRequestUserId(request);
     if (!userId) {
       reply.code(401);
       return {
         error: "missing_user_identity",
-        detail: "X-User-Id header is required",
+        detail: "Authenticated user is required",
       };
     }
 
@@ -126,17 +114,12 @@ export const filesRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.get("/api/files/:fileId/download", async (request, reply) => {
-    const headerUserId =
-      typeof request.headers["x-user-id"] === "string"
-        ? request.headers["x-user-id"]
-        : undefined;
-
-    const userId = resolveUserId(undefined, headerUserId);
+    const userId = getRequestUserId(request);
     if (!userId) {
       reply.code(401);
       return {
         error: "missing_user_identity",
-        detail: "X-User-Id header is required",
+        detail: "Authenticated user is required",
       };
     }
 

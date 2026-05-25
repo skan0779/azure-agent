@@ -12,15 +12,19 @@ import {
   AssistantChatTransport,
   useAISDKRuntime,
 } from "@assistant-ui/react-ai-sdk";
+import { LogOutIcon, UserCircleIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { Assistant } from "@/app/assistant";
+import { useAuth } from "@/app/auth-provider";
 import { ThreadListSidebar } from "@/components/assistant-ui/threadlist-sidebar";
+import { Button } from "@/components/ui/button";
 import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+import { buildBearerHeaders, type AccessTokenProvider } from "@/lib/auth";
 import { getThreadMessages } from "@/lib/thread-api";
 import { updateThread } from "@/lib/thread-api";
 import {
@@ -29,8 +33,6 @@ import {
 import { ACTIVE_THREAD_ID_STORAGE_KEY } from "@/lib/thread-store.keys";
 import { RemoteApiThreadListAdapter } from "@/lib/thread-list-adapter.remote";
 import { AgentAttachmentAdapter } from "@/lib/attachment-adapter";
-
-const DEFAULT_USER_ID = "1015521";
 
 const getStoredActiveThreadId = () => {
   if (typeof window === "undefined") {
@@ -115,22 +117,21 @@ const clearStoredActiveThreadId = () => {
 
 const cancelChatJob = async ({
   apiBaseUrl,
+  getAccessToken,
   jobId,
-  userId,
 }: {
   apiBaseUrl: string;
+  getAccessToken: AccessTokenProvider;
   jobId: string;
-  userId: string;
 }) => {
   try {
     const response = await fetch(`${apiBaseUrl}/api/chat/cancel`, {
       method: "POST",
-      headers: {
+      headers: await buildBearerHeaders(getAccessToken, {
         "Content-Type": "application/json",
-      },
+      }),
       body: JSON.stringify({
         jobId,
-        userId,
       }),
     });
 
@@ -150,10 +151,10 @@ const cancelChatJob = async ({
 
 const useLocalChatThreadRuntime = ({
   apiBaseUrl,
-  userId,
+  getAccessToken,
 }: {
   apiBaseUrl: string;
-  userId: string;
+  getAccessToken: AccessTokenProvider;
 }) => {
   const aui = useAui();
   const assistantRuntime = useAssistantRuntime();
@@ -185,11 +186,12 @@ const useLocalChatThreadRuntime = ({
     () =>
       new AssistantChatTransport({
         api: `${apiBaseUrl}/api/chat`,
-        body: {
-          userId,
+        headers: async () => {
+          const headers = await buildBearerHeaders(getAccessToken);
+          return Object.fromEntries(new Headers(headers).entries());
         },
       }),
-    [apiBaseUrl, userId],
+    [apiBaseUrl, getAccessToken],
   );
 
   const chat = useChat({
@@ -233,12 +235,12 @@ const useLocalChatThreadRuntime = ({
       jobId
         ? cancelChatJob({
             apiBaseUrl,
+            getAccessToken,
             jobId,
-            userId,
           })
         : Promise.resolve(),
     ]);
-  }, [apiBaseUrl, chat, userId]);
+  }, [apiBaseUrl, chat, getAccessToken]);
 
   const lastObservedUserMessageIdRef = useRef<string | null>(null);
   const lastUpdatedUserMessageKeyRef = useRef<string | null>(null);
@@ -265,7 +267,7 @@ const useLocalChatThreadRuntime = ({
       try {
         const messages = await getThreadMessages({
           apiBaseUrl,
-          userId,
+          getAccessToken,
           threadId: targetThreadId,
         });
 
@@ -315,7 +317,7 @@ const useLocalChatThreadRuntime = ({
         });
       }
     },
-    [apiBaseUrl, userId],
+    [apiBaseUrl, getAccessToken],
   );
 
   useEffect(() => {
@@ -418,7 +420,7 @@ const useLocalChatThreadRuntime = ({
     setOptimisticThreadTitle(remoteId, latestUserText);
     void updateThread({
       apiBaseUrl,
-      userId,
+      getAccessToken,
       threadId: remoteId,
       title: latestUserText,
       titleSource: "first-user-message",
@@ -428,13 +430,13 @@ const useLocalChatThreadRuntime = ({
         error,
       });
     });
-  }, [apiBaseUrl, currentTitle, latestUserMessageId, latestUserText, remoteId, userId]);
+  }, [apiBaseUrl, currentTitle, getAccessToken, latestUserMessageId, latestUserText, remoteId]);
 
   const attachmentAdapter = useMemo(
     () =>
       new AgentAttachmentAdapter({
         apiBaseUrl,
-        userId,
+        getAccessToken,
         // Use the existing remoteId when available; otherwise initialize the
         // thread on demand so the upload endpoint always receives a UUID.
         resolveThreadId: async () => {
@@ -446,7 +448,7 @@ const useLocalChatThreadRuntime = ({
           return result.remoteId;
         },
       }),
-    [apiBaseUrl, userId, aui],
+    [apiBaseUrl, getAccessToken, aui],
   );
 
   const runtime = useAISDKRuntime(
@@ -540,9 +542,11 @@ const InitialThreadSwitch = ({
 
 const ChatShellRuntime = ({
   apiBaseUrl,
+  getAccessToken,
   storedThreadId,
 }: {
   apiBaseUrl: string;
+  getAccessToken: AccessTokenProvider;
   storedThreadId?: string;
 }) => {
   const [isInitialThreadResolved, setIsInitialThreadResolved] = useState(
@@ -561,16 +565,16 @@ const ChatShellRuntime = ({
     () =>
       new RemoteApiThreadListAdapter({
         apiBaseUrl,
-        userId: DEFAULT_USER_ID,
+        getAccessToken,
       }),
-    [apiBaseUrl],
+    [apiBaseUrl, getAccessToken],
   );
 
   const runtime = useRemoteThreadListRuntime({
     runtimeHook: function RuntimeHook() {
       return useLocalChatThreadRuntime({
         apiBaseUrl,
-        userId: DEFAULT_USER_ID,
+        getAccessToken,
       });
     },
     adapter,
@@ -586,6 +590,7 @@ const ChatShellRuntime = ({
       <ThreadStoreSync />
       <ChatShellLayout
         apiBaseUrl={apiBaseUrl}
+        getAccessToken={getAccessToken}
         isInitialThreadResolved={isInitialThreadResolved}
       />
     </AssistantRuntimeProvider>
@@ -594,17 +599,38 @@ const ChatShellRuntime = ({
 
 const ChatShellLayout = ({
   apiBaseUrl,
+  getAccessToken,
   isInitialThreadResolved,
 }: {
   apiBaseUrl: string;
+  getAccessToken: AccessTokenProvider;
   isInitialThreadResolved: boolean;
 }) => {
+  const { account, logout } = useAuth();
+  const displayName = account.name ?? account.username;
+
   return (
     <SidebarProvider defaultOpen>
       <ThreadListSidebar />
       <SidebarInset className="bg-[#212121] text-[#ececec]">
-        <div className="flex h-14 items-center border-b border-white/10 px-3">
+        <div className="flex h-14 items-center gap-2 border-b border-white/10 px-3">
           <SidebarTrigger className="text-[#bcbcbc] hover:bg-white/10 hover:text-[#f2f2f2]" />
+          <div className="ml-auto flex min-w-0 items-center gap-2">
+            <div className="hidden min-w-0 items-center gap-2 text-sm text-[#cfcfcf] sm:flex">
+              <UserCircleIcon className="size-4 shrink-0" />
+              <span className="max-w-56 truncate">{displayName}</span>
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-[#bcbcbc] hover:bg-white/10 hover:text-[#f2f2f2]"
+              onClick={() => void logout()}
+              aria-label="Sign out"
+            >
+              <LogOutIcon className="size-4" />
+            </Button>
+          </div>
         </div>
         <main className="min-h-0 flex-1">
           {!isInitialThreadResolved ? (
@@ -612,7 +638,7 @@ const ChatShellLayout = ({
               Loading thread...
             </div>
           ) : (
-            <Assistant apiBaseUrl={apiBaseUrl} userId={DEFAULT_USER_ID} />
+            <Assistant apiBaseUrl={apiBaseUrl} getAccessToken={getAccessToken} />
           )}
         </main>
       </SidebarInset>
@@ -621,6 +647,7 @@ const ChatShellLayout = ({
 };
 
 export const ChatShell = () => {
+  const { getAccessToken } = useAuth();
   const isHydrated = useSyncExternalStore(
     () => () => {},
     () => true,
@@ -668,6 +695,7 @@ export const ChatShell = () => {
   return (
     <ChatShellRuntime
       apiBaseUrl={apiBaseUrl}
+      getAccessToken={getAccessToken}
       storedThreadId={storedThreadId}
     />
   );

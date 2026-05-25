@@ -2,6 +2,7 @@ import { createUIMessageStream, pipeUIMessageStreamToResponse } from "ai";
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 
+import { getRequestUserId } from "../auth.js";
 import {
   cancelAgentJob,
   cancelAgentJobById,
@@ -31,28 +32,15 @@ const chatBodySchema = z.object({
   id: z.string().optional(),
   messages: z.array(z.any()).default([]),
   threadId: z.string().uuid().optional(),
-  userId: z.string().min(1).optional(),
   trigger: z.string().optional(),
 });
 
 const cancelBodySchema = z.object({
   jobId: z.string().min(1),
-  userId: z.string().min(1).optional(),
 });
 
 const isSubgraphEvent = (event: AgentEvent): boolean =>
   Array.isArray(event.ns) && event.ns.length > 0;
-
-const resolveUserId = ({
-  bodyUserId,
-  headerUserId,
-}: {
-  bodyUserId?: string;
-  headerUserId?: string;
-}) => {
-  const resolved = bodyUserId?.trim() || headerUserId?.trim();
-  return resolved || null;
-};
 
 const COMPLETED_CANCEL_TTL_MS = 30_000;
 const inFlightJobCancels = new Map<string, Promise<void>>();
@@ -143,19 +131,12 @@ export const buildChatRoutes = ({
       };
     }
 
-    const headerUserId =
-      typeof request.headers["x-user-id"] === "string"
-        ? request.headers["x-user-id"]
-        : undefined;
-    const resolvedUserId = resolveUserId({
-      bodyUserId: parsed.data.userId,
-      headerUserId,
-    });
+    const resolvedUserId = getRequestUserId(request);
     if (!resolvedUserId) {
-      reply.code(400);
+      reply.code(401);
       return {
-        error: "invalid_request",
-        detail: "Missing userId or X-User-Id header",
+        error: "missing_user_identity",
+        detail: "Authenticated user is required",
       };
     }
 
@@ -195,7 +176,7 @@ export const buildChatRoutes = ({
       };
     }
 
-    const { id, messages, threadId, userId } = parsed.data;
+    const { id, messages, threadId } = parsed.data;
     const lastUserText = extractLastUserText(messages);
     const lastUserMessage = extractLastUserMessage(messages);
     if (!lastUserText) {
@@ -206,19 +187,12 @@ export const buildChatRoutes = ({
       };
     }
 
-    const headerUserId =
-      typeof request.headers["x-user-id"] === "string"
-        ? request.headers["x-user-id"]
-        : undefined;
-    const resolvedUserId = resolveUserId({
-      bodyUserId: userId,
-      headerUserId,
-    });
+    const resolvedUserId = getRequestUserId(request);
     if (!resolvedUserId) {
-      reply.code(400);
+      reply.code(401);
       return {
-        error: "invalid_request",
-        detail: "Missing userId or X-User-Id header",
+        error: "missing_user_identity",
+        detail: "Authenticated user is required",
       };
     }
     const resolvedThreadId = resolveThreadId(threadId, id);
