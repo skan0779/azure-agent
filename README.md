@@ -29,7 +29,8 @@
 ## Quickstart
 > Required and optional steps to start the service.
 
-### 1. Provision Azure Resources
+<details>
+<summary>1. Provision Azure Resources</summary>
 
 | Resource | Notes |
 | --- | --- |
@@ -54,20 +55,28 @@
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
 
-### 2. Create an Azure AI Search index
+</details>
+
+<details>
+<summary>2. Create an Azure AI Search index</summary>
+
 > This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In practice, adapt your own data. For more details, see [`README.md`](./examples/azure_ai_search/README.md).
 
-Create index schema and Upload index documents
+1. Create index schema and Upload index documents
 ```bash
 uv run python examples/azure_ai_search/create_index.py
 
 uv run python examples/azure_ai_search/create_document.py
 ```
 
-### 3. Upload prompt files to Azure Blob Storage (optional)
-> This repository provides an example system prompts in `/src/azure_agent/prompts/`. For production use, replace it with your own system prompt. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
+</details>
 
-Upload prompt files to blob
+<details>
+<summary>3. Upload prompt files to Azure Blob Storage (optional)</summary>
+
+> This repository provides an example system prompt in [`main_agent.yaml`](.src/azure_agent/prompts/main_agent.yaml) and [`sandbox_agent.yaml`](.src/azure_agent/prompts/sandbox_agent.yaml). For production use, replace it with your own system prompt with same filename. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
+
+1. Upload `main_agent.yaml` prompt file to blob container
 ```bash
 az storage blob upload \
   --connection-string "<your-blob-connection-string>" \
@@ -77,10 +86,24 @@ az storage blob upload \
   --overwrite
 ```
 
-### 4. Configure an Azure Key Vault Secrets
+2. Upload `sandbox_agent.yaml` prompt file to blob container
+```bash
+az storage blob upload \
+  --connection-string "<your-blob-connection-string>" \
+  --container-name "<your-blob-container-name>" \
+  --file src/azure_agent/prompts/sandbox_agent.yaml \
+  --name sandbox_agent.yaml \
+  --overwrite
+```
+
+</details>
+
+<details>
+<summary>4. Configure an Azure Key Vault Secrets</summary>
+
 > Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. For more details, see [`README.md`](./environments/env/README.md).
 
-Set the Key Vault Secrets:
+1. Set the Key Vault Secrets
 ```bash
 az keyvault secret set \
   --vault-name "<your-key-vault-name>" \
@@ -88,10 +111,14 @@ az keyvault secret set \
   --value "<secret-value>"
 ```
 
-### 5. Build and Push Docker Image to Azure Container Registry
+</details>
+
+<details>
+<summary>5. Build and Push Docker Image to Azure Container Registry</summary>
+
 > For more details, see [`README.md`](./environments/deploy/README.md).
 
-Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image:
+1. Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image
 ```bash
 az login
 
@@ -105,7 +132,7 @@ docker buildx build \
   --push .
 ```
 
-Build and push `azure-agent-web` docker image:
+2. Build and push `azure-agent-web` docker image
 ```bash
 docker buildx build \
   --platform linux/amd64 \
@@ -115,24 +142,34 @@ docker buildx build \
   --push .
 ```
 
-### 6. Run Azure Container App Job
+</details>
 
-Add a container `azure-agent-job`:
+<details>
+<summary>6. Run Azure Container App Job</summary>
+
+1.1 Create `azure-agent-job` container app job
 - Image source: Azure Conatiner Registry
 - Managed identity: System assigned Identity (environment)
 - Command override: `sh`
 - Arguments override: `-lc, uv run --no-sync alembic upgrade head`
+
+1.2 Configure and Run `azure-agent-job` container app job
+- Settings > Identity > System assigned: ✅
+- Settings > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>
 ```
-- Settings > Identity > System assigned: ✅
-- Settings > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
+- Overview > ▶︎ Run now
 
-### 7. Deploy and Configure an Azure Container Apps
+</details>
+
+<details>
+<summary>7. Deploy and Configure an Azure Container Apps</summary>
+
 > For more details, see [`README.md`](./environments/env/README.md).
 
-Deploy `azure-agent-api`:
+1. Deploy `azure-agent-api`
 - Ingress : ✅
 - Target port : 8080
 - Security > Identity > System assigned: ✅
@@ -150,7 +187,7 @@ SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
 SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
 ```
 
-Deploy `azure-agent-worker`:
+2. Deploy `azure-agent-worker`
 - Ingress : ❎
 - Command override: `sh`
 - Arguments override: `-lc, uv run azure-agent-worker`
@@ -173,7 +210,7 @@ WORKER_READ_BLOCK_MS=10000 # 10 seconds
 WORKER_READ_COUNT=1 # 1 entry per read
 ```
 
-Deploy `azure-agent-web`:
+3. Deploy `azure-agent-web`
 - Ingress : ✅
 - Target port : 3001
 - Security > Identity > System assigned: ✅
@@ -191,14 +228,18 @@ AZURE_AUTH_API_CLIENT_ID=<your-api-app-registration-client-id>
 AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 ```
 
-### 8. Register App Registrations
+</details>
+
+<details>
+<summary>8. Register App Registrations</summary>
+
 > Create Microsoft Entra App Registrations for `azure-agent-ui` sign-in and `azure-agent-web` JWT access token validation.
 
-1.1 Register `azure-agent-web-api`:
+1.1 Register `azure-agent-web-api`
 - Name: azure-agent-web-api
 - Supported account types: Single tenant only
 
-1.2 Configure `azure-agent-web-api`:
+1.2 Configure `azure-agent-web-api`
 - Manage > Expose an API > Application ID URI: `add`
 - Manage > Expose an API > Add a scope : 
 ```text
@@ -211,26 +252,30 @@ AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 `State`: Enabled
 ```
 
-2.1 Register `azure-agent-ui`:
+2.1 Register `azure-agent-ui`
 - Name: azure-agent-ui
 - Supported account types: Single tenant only
 - Redirect URI: https://<your-static-web-app-domain>
 
-2.2 Configure `azure-agent-ui`:
+2.2 Configure `azure-agent-ui`
 - Manage > API Permissions > Add a permission > My APIs > `azure-agent-web-api`:
 ```text
 `type of permissions`: Delegated permissions
 `permissions`: access_as_user
 ```
 
-### 9. Deploy and Configure an Azure Static Web Apps
+</details>
+
+<details>
+<summary>9. Deploy and Configure an Azure Static Web Apps</summary>
+
 > For more details, see [`README.md`](./apps/README.md).
 
-Deploy `azure-agent-ui`:
+1. Deploy `azure-agent-ui`
 - Source: Other
 - Deployment authorization policy: Deployment Token
 
-Setting Github Actions (Github Repository > Settings > Secrets and variables > Actions):
+2. Setting Github Actions secret and variables (Repository > Settings > Secrets and variables > Actions)
 - New repository secret: 
 ```env
 AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
@@ -243,24 +288,30 @@ NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
 NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
 ```
 
-Deploy `azure-agent-ui` via github workflow:
+3. Deploy `azure-agent-ui` via github workflow
 ```bash
 git push origin main
 ```
 
-### 10. Check Service Status (optional)
+</details>
+
+<details>
+<summary>10. Check Service Status (optional)</summary>
+
 > For more details, see [`README.md`](./src/azure_agent/api/README.md).
 
-Check `azure-agent-api` status:
+1. Check `azure-agent-api` status:
 - `https://<azure-agent-api-url>/agent/api/ping`
 - `https://<azure-agent-api-url>/agent/api/health`
 - `https://<azure-agent-api-url>/agent/swagger`
 
-Check `azure-agent-web` status:
+2. Check `azure-agent-web` status:
 - `https://<azure-agent-web-url>/health`
 
-Check `azure-agent-ui` status:
+3. Check `azure-agent-ui` status:
 - `https://<azure-agent-ui-url>`
+
+</details>
 
 ---
 
