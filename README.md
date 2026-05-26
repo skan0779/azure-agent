@@ -62,7 +62,7 @@
 
 > This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In practice, adapt your own data. For more details, see [`README.md`](./examples/azure_ai_search/README.md).
 
-1. Create index schema and Upload index documents
+2.1 Create index schema and Upload index documents
 ```bash
 uv run python examples/azure_ai_search/create_index.py
 
@@ -76,7 +76,7 @@ uv run python examples/azure_ai_search/create_document.py
 
 > This repository provides an example system prompt in [`main_agent.yaml`](.src/azure_agent/prompts/main_agent.yaml) and [`sandbox_agent.yaml`](.src/azure_agent/prompts/sandbox_agent.yaml). For production use, replace it with your own system prompt with same filename. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
 
-1. Upload `main_agent.yaml` prompt file to blob container
+3.1 Upload `main_agent.yaml` prompt file to blob container
 ```bash
 az storage blob upload \
   --connection-string "<your-blob-connection-string>" \
@@ -86,7 +86,7 @@ az storage blob upload \
   --overwrite
 ```
 
-2. Upload `sandbox_agent.yaml` prompt file to blob container
+3.2 Upload `sandbox_agent.yaml` prompt file to blob container
 ```bash
 az storage blob upload \
   --connection-string "<your-blob-connection-string>" \
@@ -103,7 +103,7 @@ az storage blob upload \
 
 > Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. For more details, see [`README.md`](./environments/env/README.md).
 
-1. Set the Key Vault Secrets
+4.1 Set the Key Vault Secrets
 ```bash
 az keyvault secret set \
   --vault-name "<your-key-vault-name>" \
@@ -118,7 +118,7 @@ az keyvault secret set \
 
 > For more details, see [`README.md`](./environments/deploy/README.md).
 
-1. Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image
+5.1 Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image
 ```bash
 az login
 
@@ -132,7 +132,7 @@ docker buildx build \
   --push .
 ```
 
-2. Build and push `azure-agent-web` docker image
+5.2 Build and push `azure-agent-web` docker image
 ```bash
 docker buildx build \
   --platform linux/amd64 \
@@ -147,13 +147,13 @@ docker buildx build \
 <details>
 <summary>6. Run Azure Container App Job</summary>
 
-1.1 Create `azure-agent-job` container app job
+6.1 Create `azure-agent-job` container app job
 - Image source: Azure Conatiner Registry
 - Managed identity: System assigned Identity (environment)
 - Command override: `sh`
 - Arguments override: `-lc, uv run --no-sync alembic upgrade head`
 
-1.2 Configure and Run `azure-agent-job` container app job
+6.2 Configure and Run `azure-agent-job` container app job
 - Settings > Identity > System assigned: ✅
 - Settings > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
 - Application > Containers > Environment variables:
@@ -169,7 +169,7 @@ KEY_VAULT_URL=<your-key-vault-url>
 
 > For more details, see [`README.md`](./environments/env/README.md).
 
-1. Deploy `azure-agent-api`
+7.1 Deploy `azure-agent-api`
 - Ingress : ✅
 - Target port : 8080
 - Security > Identity > System assigned: ✅
@@ -187,7 +187,7 @@ SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
 SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
 ```
 
-2. Deploy `azure-agent-worker`
+7.2 Deploy `azure-agent-worker`
 - Ingress : ❎
 - Command override: `sh`
 - Arguments override: `-lc, uv run azure-agent-worker`
@@ -210,7 +210,7 @@ WORKER_READ_BLOCK_MS=10000 # 10 seconds
 WORKER_READ_COUNT=1 # 1 entry per read
 ```
 
-3. Deploy `azure-agent-web`
+7.3 Deploy `azure-agent-web`
 - Ingress : ✅
 - Target port : 3001
 - Security > Identity > System assigned: ✅
@@ -235,11 +235,11 @@ AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 
 > Create Microsoft Entra App Registrations for `azure-agent-ui` sign-in and `azure-agent-web` JWT access token validation.
 
-1.1 Register `azure-agent-web-api`
+8.1 Register `azure-agent-web-api`
 - Name: azure-agent-web-api
 - Supported account types: Single tenant only
 
-1.2 Configure `azure-agent-web-api`
+8.2 Configure `azure-agent-web-api`
 - Manage > Expose an API > Application ID URI: `add`
 - Manage > Expose an API > Add a scope : 
 ```text
@@ -252,12 +252,12 @@ AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 `State`: Enabled
 ```
 
-2.1 Register `azure-agent-ui`
+8.3 Register `azure-agent-ui`
 - Name: azure-agent-ui
 - Supported account types: Single tenant only
 - Redirect URI: https://<your-static-web-app-domain>
 
-2.2 Configure `azure-agent-ui`
+8.4 Configure `azure-agent-ui`
 - Manage > API Permissions > Add a permission > My APIs > `azure-agent-web-api`:
 ```text
 `type of permissions`: Delegated permissions
@@ -271,11 +271,11 @@ AZURE_AUTH_REQUIRED_SCOPE=access_as_user
 
 > For more details, see [`README.md`](./apps/README.md).
 
-1. Deploy `azure-agent-ui`
+9.1 Deploy `azure-agent-ui`
 - Source: Other
 - Deployment authorization policy: Deployment Token
 
-2. Setting Github Actions secret and variables (Repository > Settings > Secrets and variables > Actions)
+9.2 Setting Github Actions secret and variables (Repository > Settings > Secrets and variables > Actions)
 - New repository secret: 
 ```env
 AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
@@ -288,7 +288,7 @@ NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
 NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
 ```
 
-3. Deploy `azure-agent-ui` via github workflow
+9.3 Deploy `azure-agent-ui` via github workflow
 ```bash
 git push origin main
 ```
@@ -300,15 +300,15 @@ git push origin main
 
 > For more details, see [`README.md`](./src/azure_agent/api/README.md).
 
-1. Check `azure-agent-api` status:
+10.1 Check `azure-agent-api` status:
 - `https://<azure-agent-api-url>/agent/api/ping`
 - `https://<azure-agent-api-url>/agent/api/health`
 - `https://<azure-agent-api-url>/agent/swagger`
 
-2. Check `azure-agent-web` status:
+10.2 Check `azure-agent-web` status:
 - `https://<azure-agent-web-url>/health`
 
-3. Check `azure-agent-ui` status:
+10.3 Check `azure-agent-ui` status:
 - `https://<azure-agent-ui-url>`
 
 </details>
