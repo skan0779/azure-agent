@@ -37,15 +37,14 @@ class AppSecrets:
     # Azure Database for PostgreSQL
     POSTGRES_CONN_STRING: str
     POSTGRES_WEB_CONN_STRING: str
-    # Tiktoken
-    TIKTOKEN_ENCODER: str
     # Azure AI Content Safety
     AZURE_AI_CONTENT_SAFETY_ENDPOINT: str
     AZURE_AI_CONTENT_SAFETY_API_KEY: str
     # Azure Container Apps Dynamic Sessions
     AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT: str
     AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT: str
-
+    # Tiktoken
+    TIKTOKEN_ENCODER: str
 
 async def load_app_secrets(secret_client: SecretClient) -> AppSecrets:
     async def get_secret_value(field_name, default=MISSING):

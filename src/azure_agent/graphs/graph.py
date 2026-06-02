@@ -26,6 +26,8 @@ from deepagents import create_deep_agent, CompiledSubAgent
 from deepagents.backends import CompositeBackend, StateBackend, StoreBackend
 from deepagents.backends.utils import create_file_data
 
+from langfuse.langchain import CallbackHandler
+
 from azure_agent.backends import MultimodalSessionsBashBackend
 from azure_agent.infra.key_vault import create_async_secret_client
 from azure_agent.config import AppSecrets, load_app_secrets
@@ -691,9 +693,22 @@ class LangGraphProcess:
             job_id=job_id, 
             user_id=user_id,
         )
+        
+        # Langfuse Handler (observability)
+        handler = CallbackHandler()
 
         # Runnable Config
         config = RunnableConfig(
+            # tags=[],
+            metadata={
+                "langfuse_user_id": user_id,
+                "langfuse_session_id": thread_id,
+                "user_id": user_id,
+                "thread_id": thread_id,
+                "job_id": job_id,
+            },
+            callbacks=[handler],
+            run_name="azure-agent",
             recursion_limit=30,
             configurable={
                 "thread_id": thread_id,

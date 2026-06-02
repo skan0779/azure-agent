@@ -197,6 +197,7 @@ SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
 - Application > Containers > Environment variables:
 ```env
 KEY_VAULT_URL=<your-key-vault-url>
+LANGFUSE_BASE_URL=http://<your-langfuse-base-url>:3000
 JOB_TTL_SECONDS=86400 # 1 day
 EVENT_TTL_SECONDS=86400 # 1 day
 IDEMPOTENCY_TTL_SECONDS=86400 # 1 day
@@ -383,7 +384,7 @@ azure-agent/
 | Secret Management  | [keyvault](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/keyvault) | Azure Key Vault |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
 | Authentication | [MSAL/JWT](https://learn.microsoft.com/ko-kr/entra/msal/python/) | Microsoft Entra ID, App Registration  |
-<!-- | Observability | [Langfuse](https://github.com/langfuse/langfuse) | - | -->
+| Observability | [Langfuse](https://github.com/langfuse/langfuse) | Azure Kubernetes Service, ... |
 
 ---
 
