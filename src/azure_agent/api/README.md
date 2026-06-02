@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/FastAPI.svg" height="72" alt="FastAPI" />
-</p>
-
 <h1 align="center">API</h1>
 
 <p align="center">

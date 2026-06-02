@@ -1,8 +1,4 @@
-<p align="center">
-  <img src="/docs/icons/LangGraph.webp" height="72" alt="LangGraph" />
-</p>
-
-<h1 align="center">LangGraph Agent</h1>
+<h1 align="center">LangGraph Deep Agent</h1>
 
 <p align="center">
   LangChain & LangGraph based Azure AI Agent
@@ -16,9 +12,9 @@
 | Category | Implementation |
 | --- | --- |
 | Framework | LangChain, LangGraph |
-| Models | Azure AI foundry(Model-router, GPT-4o-mini, Text-embedding-3-large) |
-| Tools | Azure AI Search, Tavily Search, LangMem |
-| Memory | Checkpointer(Redis), Store(PostgreSQL), LangMem(PostgreSQL) |
+| Models | Azure AI foundry(GPT-5.*, Text-embedding-3-large) |
+| Tools | Azure AI Search, Bing Search, PythonREPL, Conatiner Sandbox |
+| Memory | Checkpointer(Redis), Store(PostgreSQL) |
 | Context | SummarizationMiddleware(LangChain) |
 | Prompt | Azure Blob Storage |
 | Guardrail | Azure AI Content Safety, PIIMiddleware(LangChain) |
@@ -162,7 +158,7 @@ Long-term memory:
 ### Context Management
 > Control context growth during long conversations
 
-- `SummarizationMiddleware`: Triggers when context reaches `20000` tokens (keep `20` messages)
+- `SummarizationMiddleware`: Triggers when context reaches max tokens
 
 ### Prompts
 > Prompt loading and fallback strategy at startup
@@ -176,4 +172,5 @@ Long-term memory:
 
 - `PIIMiddleware`: guardrail and mask `email`, `credit_card` text inputs
 - `AzurePromptShieldMiddleware`: blocks prompt injection attempts when Azure AI Content Safety secrets are configured
-- `AzureContentModerationMiddleware`: moderates model inputs with Azure AI Content Safety when configured
+- `azure_content_moderation_middleware`: moderates model inputs with Azure AI Content Safety when configured
+- `azure_prompt_shield_middleware`: moderates model inputs with Azure AI Content Safety when configured

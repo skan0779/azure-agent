@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/Key-Vault.svg" height="72" alt="Key Vault" />
-</p>
-
 <h1 align="center">Environment & Key Vault</h1>
 
 <p align="center">

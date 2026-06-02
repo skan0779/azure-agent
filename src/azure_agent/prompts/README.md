@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/Azure-Storage-Account.svg" height="72" alt="Azure Storage Account" />
-</p>
-
 <h1 align="center">Azure Storage Account (blob storage)</h1>
 
 <p align="center">

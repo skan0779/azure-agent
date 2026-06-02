@@ -1,6 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/Azure-Static-Web-Apps.svg" height="72" alt="Azure SWA" />
-
 <h1 align="center">UI</h1>
 
 <p align="center">

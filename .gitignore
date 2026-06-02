@@ -1,12 +1,14 @@
 # Test
 test/
 template.json
+graph_react_agent.py
 
 # UI
 node_modules/
 .pnpm-store/
 dist/
 .turbo/
+.bkp
 
 # Next.js / frontend
 out/

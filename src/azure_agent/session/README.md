@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/Azure-Managed-Redis.svg" height="72" alt="Azure Managed Redis" />
-</p>
-
 <h1 align="center">Session Manager</h1>
 
 <p align="center">

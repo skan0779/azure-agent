@@ -315,12 +315,54 @@ git push origin main
 
 ---
 
-## Agent Features
+## Project Structure
+
+```text
+azure-agent/
+├── .github/workflows/         # GitHub Actions workflow
+├── apps/
+│   ├── azure-agent-ui/        # Next.js frontend (chat UI)
+│   └── azure-agent-web/       # Fastify web gateway (auth, threads, files, proxying)
+├── docs/                      # Documents (diagrams, videos, icons)
+├── environments/
+│   ├── deploy/                # Docker files
+│   ├── env/                   # Environment variable and Key Vault secret templates
+│   └── infra/                 # Terraform templates (pulbic network ver.)
+├── examples/
+│   └── azure_ai_search/       # Azure AI Search indexing and retrieval examples
+├── src/
+│   └── azure_agent/
+│       ├── api/               # FastAPI server
+│       ├── backends/          # Runtime backend adapters
+│       ├── config/            # Runtime config and secret loading models
+│       ├── database/          # Database migration setup and Alembic revisions
+│       ├── encoder/           # Bundled tiktoken cache files for air-gapped environments
+│       ├── files/             # File metadata schemas and persistence helpers
+│       ├── graphs/            # LangGraph agent construction and execution flow
+│       ├── infra/             # Azure Key Vault, Redis, and shared infrastructure helpers
+│       ├── jobs/              # Redis Stream job queue and event persistence
+│       ├── memories/          # Agent memory files
+│       ├── middlewares/       # Custom agent/runtime middleware
+│       ├── prompts/           # Agent prompts
+│       ├── session/           # Thread session ownership, locking, and job coordination
+│       ├── skills/            # Agent skills
+│       ├── tools/             # Agent tools
+│       └── worker/            # Background worker that consumes jobs and runs the graph
+├── package.json               # pnpm workspace root
+├── pnpm-workspace.yaml        # pnpm workspace definition
+├── pnpm-lock.yaml             # JavaScript dependency lockfile
+├── pyproject.toml             # Python package metadata
+└── uv.lock                    # Python dependency lockfile
+```
+
+---
+
+## Service Features
 
 | Category | Library | Resource |
 | --- | --- | --- |
-| RAG | [AzureSearch](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
-| Web Search | [Web search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI |
+| RAG | [Azure Search](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
+| Web Search | [Web search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI (Grounding with Bing Search) |
 | Sandbox Environment | [SessionsBashBackend](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (shell) |
 | Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (python) |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
@@ -330,7 +372,7 @@ git push origin main
 | Agent Orchestration | [SubAgentMiddleware](https://reference.langchain.com/python/deepagents/middleware/subagents/SubAgentMiddleware) | - |
 | Task Management | [TodoListMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/todo/TodoListMiddleware) | Azure Managed Redis (Enterprise) |
 | File Management | [FilesystemMiddleware](https://reference.langchain.com/python/deepagents/middleware/filesystem/FilesystemMiddleware) | Azure Database for PostgreSQL |
-| Rate Limiting | [ModelCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/model_call_limit/ModelCallLimitMiddleware), [ToolCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/tool_call_limit/ToolCallLimitMiddleware), .. | - |
+| Rate Limiting | [ModelCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/model_call_limit/ModelCallLimitMiddleware), [ToolCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/tool_call_limit/ToolCallLimitMiddleware) | - |
 | Content Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | Prompt Sheild | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | PII | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | - |
@@ -346,6 +388,6 @@ git push origin main
 ---
 
 ## License
-> This project is licensed under the Apache License 2.0 [LICENSE](./LICENSE).
+> This project is licensed under the [Apache License 2.0](./LICENSE).
 
-Bundled `Swagger UI assets`, `OpenAI Skills`, `MS Learn Documents` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.
+Bundled `Swagger UI static`, `Tiktoken cache`, `OpenAI Skills` may require separate upstream license notice files during redistribution. If you update or re-bundle these assets, include all required third-party notices in the distributed package.

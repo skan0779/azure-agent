@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="/docs/icons/OpenAI.svg" height="72" alt="OpenAI" />
-</p>
-
 <h1 align="center">Token Encoder</h1>
 
 <p align="center">
