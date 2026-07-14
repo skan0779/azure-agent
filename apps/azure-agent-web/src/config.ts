@@ -25,6 +25,21 @@ const splitOptionalCsv = (value: string | undefined): string[] => {
     .filter(Boolean);
 };
 
+const requiredEnv = (name: string): string => {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(`${name} is required`);
+  }
+  if (
+    value.length >= 2 &&
+    value[0] === value[value.length - 1] &&
+    (value[0] === "\"" || value[0] === "'")
+  ) {
+    return value.slice(1, -1);
+  }
+  return value;
+};
+
 const matchesOriginPattern = (origin: string, pattern: string) => {
   if (pattern === "*") {
     return true;
@@ -61,7 +76,7 @@ export const config = {
   corsOrigins,
   agentApiBaseUrl:
     process.env.AGENT_API_BASE_URL ?? "http://127.0.0.1:8080",
-  keyVaultUrl: process.env.KEY_VAULT_URL?.trim(),
+  postgresWebConnString: requiredEnv("POSTGRES_WEB_CONN_STRING"),
   auth: {
     tenantId: azureAuthTenantId,
     apiClientId: azureAuthApiClientId,

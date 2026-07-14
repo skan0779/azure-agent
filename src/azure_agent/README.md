@@ -28,7 +28,7 @@
 | `config/` | Runtime configuration models and environment-based config loading | Central place for TTLs, worker polling, and SSE timeout settings |
 | `encoder/` | Bundled `tiktoken` cache files | Supports air-gapped or offline-friendly runtime environments |
 | `graphs/` | LangGraph agent construction, runtime setup, and stream event shaping | Builds models, tools, memory, prompts, and graph execution flow |
-| `infra/` | Shared infrastructure helpers for external services | Includes Azure Key Vault and Redis client creation |
+| `infra/` | Shared infrastructure helpers for external services | Includes Redis client creation |
 | `jobs/` | Job queue and event persistence helpers on Redis Stream | Manages job creation, replay, patching, and result event append/read |
 | `middlewares/` | Custom middleware used by the agent runtime | Currently used for custom stream events before agent/model execution |
 | `prompts/` | Local YAML prompt files | Used as startup fallback when Blob prompt loading fails |

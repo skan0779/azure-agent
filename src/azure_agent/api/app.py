@@ -16,10 +16,9 @@ from azure.storage.blob.aio import ContainerClient
 from azure_agent.api.routes.files import router as files_router
 from azure_agent.api.routes.health import router as health_router
 from azure_agent.api.routes.job import router as job_router
-from azure_agent.config import load_runtime_config
+from azure_agent.config import load_api_settings, load_runtime_config
 from azure_agent.api.routes.ping import router as ping_router
 from azure_agent.files import AgentFileRepository
-from azure_agent.infra.key_vault import create_secret_client
 from azure_agent.infra.redis import close_redis_client, create_redis_stream_client
 from azure_agent.session import SessionManager
 
@@ -36,19 +35,17 @@ logging.basicConfig(
 async def lifespan(app: FastAPI):
     """Application startup and shutdown events"""
     runtime_config = load_runtime_config()
+    api_settings = load_api_settings()
     app.state.runtime_config = runtime_config
-
-    # Initialize Secret Client
-    secret_client = create_secret_client()
 
     # Initialize file storage dependencies
     try:
         app.state.blob_container_client = ContainerClient.from_connection_string(
-            conn_str=str(secret_client.get_secret("BLOB-CONNECTION-STRING").value),
+            conn_str=api_settings.blob_connection_string,
             container_name="files",
         )
         app.state.agent_file_repository = AgentFileRepository(
-            conn_string=str(secret_client.get_secret("POSTGRES-WEB-CONN-STRING").value),
+            conn_string=api_settings.postgres_web_conn_string,
         )
         await app.state.agent_file_repository.open()
         logger.info("[app.py] File storage initialize success")
@@ -61,14 +58,13 @@ async def lifespan(app: FastAPI):
                 logger.warning("[app.py] Failed to close agent file repository pool")
         app.state.blob_container_client = None
         app.state.agent_file_repository = None
-        secret_client.close()
         logger.exception("[app.py] Failed to initialize file storage")
         raise RuntimeError("File storage initialization failed") from exc
 
     # Initialize Redis Stream Client (queue)
     redis_stream_client = None
     try:
-        redis_stream_client = create_redis_stream_client(secret_client)
+        redis_stream_client = create_redis_stream_client(api_settings.redis_stream)
         app.state.redis_stream_client = redis_stream_client
         app.state.session_manager = SessionManager(
             redis_stream_client,
@@ -95,8 +91,6 @@ async def lifespan(app: FastAPI):
         app.state.agent_file_repository = None
         logger.exception("[app.py] Failed to initialize stream redis client")
         raise RuntimeError("Stream Redis initialization failed") from exc
-    finally:
-        secret_client.close()
 
     # Yield to application
     try:

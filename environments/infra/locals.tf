@@ -51,7 +51,6 @@ locals {
   )
 
   api_env = {
-    KEY_VAULT_URL                   = azurerm_key_vault.main.vault_uri
     SSE_MAX_CONNECTION_SECONDS      = tostring(var.sse_max_connection_seconds)
     JOB_TTL_SECONDS                 = tostring(var.job_ttl_seconds)
     EVENT_TTL_SECONDS               = tostring(var.event_ttl_seconds)
@@ -63,7 +62,6 @@ locals {
 
   worker_env = merge(
     {
-      KEY_VAULT_URL                     = azurerm_key_vault.main.vault_uri
       JOB_TTL_SECONDS                   = tostring(var.job_ttl_seconds)
       EVENT_TTL_SECONDS                 = tostring(var.event_ttl_seconds)
       IDEMPOTENCY_TTL_SECONDS           = tostring(var.idempotency_ttl_seconds)
@@ -75,14 +73,12 @@ locals {
       WORKER_PENDING_CLAIM_COUNT        = tostring(var.worker_pending_claim_count)
       WORKER_READ_BLOCK_MS              = tostring(var.worker_read_block_ms)
       WORKER_READ_COUNT                 = tostring(var.worker_read_count)
-      AZURE_AGENT_TIKTOKEN_CACHE_DIR    = "/app/src/azure_agent/encoder"
     },
     var.worker_extra_env,
   )
 
   web_env = merge(
     {
-      KEY_VAULT_URL      = azurerm_key_vault.main.vault_uri
       AGENT_API_BASE_URL = var.deploy_container_apps ? "https://${azurerm_container_app.api[0].ingress[0].fqdn}" : ""
       CORS_ORIGINS       = "https://${azurerm_static_web_app.ui.default_host_name}"
       HOST               = "0.0.0.0"
@@ -90,6 +86,87 @@ locals {
     },
     var.web_extra_env,
   )
+
+  api_secret_env_names = [
+    "BLOB_CONNECTION_STRING",
+    "POSTGRES_WEB_CONN_STRING",
+    "REDIS_STREAM_HOST",
+    "REDIS_STREAM_USERNAME",
+    "REDIS_STREAM_ACCESS_KEY",
+    "REDIS_STREAM_PORT",
+  ]
+
+  worker_secret_env_names = [
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_API_KEY",
+    "AZURE_OPENAI_API_VERSION",
+    "AZURE_OPENAI_MAIN_MODEL",
+    "AZURE_OPENAI_MAIN_MODEL_TIMEOUT",
+    "AZURE_OPENAI_SMALL_MODEL",
+    "AZURE_OPENAI_SMALL_MODEL_TIMEOUT",
+    "AZURE_OPENAI_EMBEDDING_MODEL",
+    "AZURE_OPENAI_EMBEDDING_DIMS",
+    "AZURE_AI_SEARCH_ENDPOINT",
+    "AZURE_AI_SEARCH_API_KEY",
+    "AZURE_AI_SEARCH_INDEX_NAME",
+    "AZURE_AI_SEARCH_SEMANTIC_CONFIG",
+    "AZURE_AI_SEARCH_API_VERSION",
+    "AZURE_AI_SEARCH_TOP_K",
+    "AZURE_AI_CONTENT_SAFETY_ENDPOINT",
+    "AZURE_AI_CONTENT_SAFETY_API_KEY",
+    "AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT",
+    "AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT",
+    "BLOB_CONNECTION_STRING",
+    "REDIS_HOST",
+    "REDIS_USERNAME",
+    "REDIS_ACCESS_KEY",
+    "REDIS_PORT",
+    "REDIS_DB",
+    "REDIS_STREAM_HOST",
+    "REDIS_STREAM_USERNAME",
+    "REDIS_STREAM_ACCESS_KEY",
+    "REDIS_STREAM_PORT",
+    "POSTGRES_CONN_STRING",
+    "POSTGRES_WEB_CONN_STRING",
+    "LANGFUSE_PUBLIC_KEY",
+    "LANGFUSE_SECRET_KEY",
+  ]
+
+  web_secret_env_names = [
+    "POSTGRES_WEB_CONN_STRING",
+  ]
+
+  job_secret_env_names = [
+    "POSTGRES_WEB_CONN_STRING",
+  ]
+
+  api_secret_env = {
+    for name in local.api_secret_env_names : name => {
+      secret_name           = lower(replace(name, "_", "-"))
+      key_vault_secret_name = replace(name, "_", "-")
+    }
+  }
+
+  worker_secret_env = {
+    for name in local.worker_secret_env_names : name => {
+      secret_name           = lower(replace(name, "_", "-"))
+      key_vault_secret_name = replace(name, "_", "-")
+    }
+  }
+
+  web_secret_env = {
+    for name in local.web_secret_env_names : name => {
+      secret_name           = lower(replace(name, "_", "-"))
+      key_vault_secret_name = replace(name, "_", "-")
+    }
+  }
+
+  job_secret_env = {
+    for name in local.job_secret_env_names : name => {
+      secret_name           = lower(replace(name, "_", "-"))
+      key_vault_secret_name = replace(name, "_", "-")
+    }
+  }
 
   key_vault_secret_names = [
     "AZURE-OPENAI-ENDPOINT",
@@ -123,7 +200,8 @@ locals {
     "REDIS-STREAM-PORT",
     "POSTGRES-CONN-STRING",
     "POSTGRES-WEB-CONN-STRING",
-    "TIKTOKEN-ENCODER",
+    "LANGFUSE-SECRET-KEY",
+    "LANGFUSE-PUBLIC-KEY",
   ]
 
   tags = merge(

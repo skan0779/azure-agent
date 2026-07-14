@@ -54,6 +54,16 @@ resource "azurerm_container_app" "api" {
     identity = azurerm_user_assigned_identity.api.id
   }
 
+  dynamic "secret" {
+    for_each = local.api_secret_env
+
+    content {
+      name                = secret.value.secret_name
+      key_vault_secret_id = "${azurerm_key_vault.main.vault_uri}secrets/${secret.value.key_vault_secret_name}"
+      identity            = azurerm_user_assigned_identity.api.id
+    }
+  }
+
   ingress {
     external_enabled = true
     target_port      = 8080
@@ -83,6 +93,15 @@ resource "azurerm_container_app" "api" {
           value = env.value
         }
       }
+
+      dynamic "env" {
+        for_each = local.api_secret_env
+
+        content {
+          name        = env.key
+          secret_name = env.value.secret_name
+        }
+      }
     }
   }
 
@@ -110,6 +129,16 @@ resource "azurerm_container_app" "worker" {
     identity = azurerm_user_assigned_identity.worker.id
   }
 
+  dynamic "secret" {
+    for_each = local.worker_secret_env
+
+    content {
+      name                = secret.value.secret_name
+      key_vault_secret_id = "${azurerm_key_vault.main.vault_uri}secrets/${secret.value.key_vault_secret_name}"
+      identity            = azurerm_user_assigned_identity.worker.id
+    }
+  }
+
   template {
     min_replicas = var.worker_min_replicas
     max_replicas = var.worker_max_replicas
@@ -128,6 +157,15 @@ resource "azurerm_container_app" "worker" {
         content {
           name  = env.key
           value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.worker_secret_env
+
+        content {
+          name        = env.key
+          secret_name = env.value.secret_name
         }
       }
     }
@@ -160,6 +198,16 @@ resource "azurerm_container_app" "web" {
     identity = azurerm_user_assigned_identity.web.id
   }
 
+  dynamic "secret" {
+    for_each = local.web_secret_env
+
+    content {
+      name                = secret.value.secret_name
+      key_vault_secret_id = "${azurerm_key_vault.main.vault_uri}secrets/${secret.value.key_vault_secret_name}"
+      identity            = azurerm_user_assigned_identity.web.id
+    }
+  }
+
   ingress {
     external_enabled = true
     target_port      = 3001
@@ -187,6 +235,15 @@ resource "azurerm_container_app" "web" {
         content {
           name  = env.key
           value = env.value
+        }
+      }
+
+      dynamic "env" {
+        for_each = local.web_secret_env
+
+        content {
+          name        = env.key
+          secret_name = env.value.secret_name
         }
       }
     }
@@ -219,6 +276,16 @@ resource "azurerm_container_app_job" "manual" {
     identity = azurerm_user_assigned_identity.job.id
   }
 
+  dynamic "secret" {
+    for_each = local.job_secret_env
+
+    content {
+      name                = secret.value.secret_name
+      key_vault_secret_id = "${azurerm_key_vault.main.vault_uri}secrets/${secret.value.key_vault_secret_name}"
+      identity            = azurerm_user_assigned_identity.job.id
+    }
+  }
+
   manual_trigger_config {
     parallelism              = 1
     replica_completion_count = 1
@@ -229,16 +296,16 @@ resource "azurerm_container_app_job" "manual" {
       name    = "job"
       image   = "${azurerm_container_registry.main.login_server}/${var.api_worker_image_tag}"
       command = ["sh"]
-      args    = ["-lc", "uv run azure-agent-worker"]
+      args    = ["-lc", "uv run --no-sync alembic upgrade head"]
       cpu     = var.job_cpu
       memory  = var.job_memory
 
       dynamic "env" {
-        for_each = local.worker_env
+        for_each = local.job_secret_env
 
         content {
-          name  = env.key
-          value = env.value
+          name        = env.key
+          secret_name = env.value.secret_name
         }
       }
     }

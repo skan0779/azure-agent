@@ -1,32 +1,16 @@
 from __future__ import annotations
 
-import os
-
 from alembic import context
-from azure.identity import DefaultAzureCredential
-from azure.keyvault.secrets import SecretClient
 from sqlalchemy import engine_from_config, pool
+
+from azure_agent.config import require_env
 
 
 config = context.config
 target_metadata = None
 
-# Azure Key Vault
-vault_url = os.getenv("KEY_VAULT_URL")
-if not vault_url:
-    raise RuntimeError("KEY_VAULT_URL is required for database migrations.")
-credential = DefaultAzureCredential()
-secret_client = SecretClient(
-    vault_url=vault_url,
-    credential=credential
-)
-
 # Azure Database for PostgreSQL
-try:
-    postgres_url = (secret_client.get_secret("POSTGRES-WEB-CONN-STRING").value or "").strip()
-finally:
-    secret_client.close()
-    credential.close()
+postgres_url = require_env("POSTGRES_WEB_CONN_STRING")
 database_url = postgres_url.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Run migrations (offline)

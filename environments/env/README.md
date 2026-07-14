@@ -1,14 +1,16 @@
 <h1 align="center">Environment & Key Vault</h1>
 
 <p align="center">
-  Define secret values in Azure Key Vault.
-  Provide </code>.env.example</code> as an environment variable when creating the container.
+  Define the secret values that must be stored in Azure Key Vault.
 </p>
 
 ---
 
 ## 1. Key Vault Secrets
 > Azure Key Vault stores secret values such as API keys, connection strings, and credentials.
+> Container Apps should reference these secrets under **Security > Secrets**, then inject them into runtime environment variables with `secretref`.
+
+Use [`./.env.keyvault`](./.env.keyvault) as the source of truth for Key Vault secret names.
 
 ```env
 # Azure OpenAI
@@ -60,20 +62,17 @@ POSTGRES-CONN-STRING=
 # Azure Database for Postgres (Web)
 POSTGRES-WEB-CONN-STRING=
 
-# Tokenizer
-TIKTOKEN-ENCODER=
-
 # Langfuse
-LANGFUSE_SECRET_KEY=
-LANGFUSE_PUBLIC_KEY=
+LANGFUSE-SECRET-KEY=
+LANGFUSE-PUBLIC-KEY=
 ```
 
 ---
 
-## 2. Direct access (recommended)
+## 2. Set secrets from your machine
 
 ### 2.1 Ensure your account has one of these roles in Key Vault
-> Key Vault Secrets Officer, Key Vault Secrets User
+> Key Vault Secrets Officer
 
 ### 2.2 Allow public access from specific IP addresses in Key Vault
 > Add your Client IP address
@@ -90,7 +89,7 @@ az keyvault secret set --vault-name <key-vault-name> --name SECRET_NAME --value 
 Use this path if you cannot reach the Key Vault due to network restrictions (no public access).
 
 ### 3.1 Assign a role
-> Assign Key Vault Secrets Officer or Key Vault Secrets User to your account.
+> Assign Key Vault Secrets Officer to your account.
 
 ### 3.2 Create a private endpoint and DNS
 > Create and associate a private endpoint and DNS for the Key Vault.

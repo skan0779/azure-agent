@@ -1,8 +1,8 @@
 <h1 align="center">Token Encoder</h1>
 
 <p align="center">
-  Cache location can be overridden with </code>AZURE_AGENT_TIKTOKEN_CACHE_DIR</code>.
-  Default is </code>src/azure_agent/encoder</code>.
+  Bundled tiktoken cache files used through </code>TIKTOKEN_CACHE_DIR</code>.
+  The runtime default is </code>src/azure_agent/encoder</code>.
 </p>
 
 ![tiktoken 0.11.0](https://img.shields.io/badge/tiktoken-0.11.0-6E4AFF) 

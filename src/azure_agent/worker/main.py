@@ -7,9 +7,12 @@ from redis.exceptions import ResponseError
 
 from langchain_azure_ai.agents.middleware import ContentSafetyViolationError
 
-from azure_agent.config import RuntimeConfig, load_runtime_config
+from azure_agent.config import (
+    RuntimeConfig,
+    load_redis_stream_settings,
+    load_runtime_config,
+)
 from azure_agent.graphs.graph import LangGraphProcess
-from azure_agent.infra.key_vault import create_secret_client
 from azure_agent.infra.redis import close_redis_client, create_redis_stream_client
 from azure_agent.api.schema import JobStatus
 from azure_agent.jobs.queue import append_event, get_job, patch_job
@@ -148,17 +151,15 @@ class JobWorker:
     async def setup(self) -> None:
         """
         Setup the JobWorker
-        - set Secret Client.
         - set Redis Stream Client.
         - set LangGraph Agent.
         - setup LangGraph Agent.
         - create Redis Stream consumer group. (if not exists)
         """
-        # Set Secret Client
-        secret_client = create_secret_client()
-
         # Set Redis Stream Client
-        self.redis_stream_client = create_redis_stream_client(secret_client)
+        self.redis_stream_client = create_redis_stream_client(
+            load_redis_stream_settings()
+        )
         self.session_manager = SessionManager(
             self.redis_stream_client,
             lock_ttl_seconds=self.runtime_config.session.lock_ttl_seconds,

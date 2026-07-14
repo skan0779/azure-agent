@@ -9,8 +9,9 @@ services:
     restart: unless-stopped
     ports:
       - "8001:8080"
+    env_file:
+      - ../env/.env.dev
     environment:
-      KEY_VAULT_URL: ${KEY_VAULT_URL}
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
       LOG_LEVEL: ${LOG_LEVEL:-info}
@@ -40,8 +41,9 @@ services:
     container_name: azure-agent-worker
     restart: unless-stopped
     command: ["sh", "-lc", "uv run azure-agent-worker"]
+    env_file:
+      - ../env/.env.dev
     environment:
-      KEY_VAULT_URL: ${KEY_VAULT_URL}
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
       LOG_LEVEL: ${LOG_LEVEL:-info}

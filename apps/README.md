@@ -53,7 +53,7 @@ Security:
 Application:
 - Application > Containers > Environment variables:
 ```env
-KEY_VAULT_URL=<your-key-vault-url>
+POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
 AGENT_API_BASE_URL=<your-azure-agent-api-url>
 CORS_ORIGINS=https://<your-static-web-app-domain>
 AZURE_AUTH_TENANT_ID=<directory-tenant-id>

@@ -3,8 +3,6 @@ from pathlib import Path
 from collections.abc import Awaitable, Callable
 
 from azure.storage.blob.aio import ContainerClient
-from azure.identity.aio import DefaultAzureCredential
-from azure.keyvault.secrets.aio import SecretClient
 
 from redis.asyncio import Redis
 
@@ -29,8 +27,7 @@ from deepagents.backends.utils import create_file_data
 from langfuse.langchain import CallbackHandler
 
 from azure_agent.backends import MultimodalSessionsBashBackend
-from azure_agent.infra.key_vault import create_async_secret_client
-from azure_agent.config import AppSecrets, load_app_secrets
+from azure_agent.config import GraphSettings, load_graph_settings
 from azure_agent.files import AgentFileRepository
 from azure_agent.graphs.schema import AgentContext
 from azure_agent.tools.azure_ai_search import create_azure_ai_search_tool
@@ -49,7 +46,7 @@ logger = logging.getLogger(__name__)
 class LangGraphProcess:
     """
     LangGraphProcess application configuration and runtime resource manager:
-    - Load Azure Key Vault Secrets
+    - Load environment settings
     - Create Azure OpenAI models (main, small, embedding)
     - Create Azure AI Search vectorstore and retriever-backed tool
     - Create Redis Client
@@ -57,14 +54,11 @@ class LangGraphProcess:
     - Create Store (Postgres)
     - Build Agent runnable
     """
-    def __init__(self, vault_url: str | None = None) -> None:
+    def __init__(self) -> None:
         """
         Initialize lightweight application state.
         """
-        self.vault_url = vault_url
-        self.secret_client: SecretClient | None = None
-        self.secret_credential: DefaultAzureCredential | None = None
-        self.secrets: AppSecrets | None = None
+        self.settings: GraphSettings | None = None
         self.prompt_cache: dict[str, str] = {}
 
         # Runtime clients / models
@@ -88,7 +82,7 @@ class LangGraphProcess:
         Initialize application runtime resources.
 
         Responsibilities:
-            Load Azure Key Vault Secrets
+            Load environment settings
             Create Azure OpenAI models (main, small, embedding)
             Create Azure AI Search vectorstore
             Create Blob Client
@@ -98,7 +92,7 @@ class LangGraphProcess:
             Load Prompt Cache
             Build Agent runnable
         """
-        await self._load_secrets()
+        self._load_settings()
         self._load_instance()
 
         # Open file repository connection pool
@@ -106,15 +100,15 @@ class LangGraphProcess:
             await self.agent_file_repository.open()
 
         # Redis Client
-        if self.secrets is None:
-            raise RuntimeError("Secrets are not loaded")
-        secrets = self.secrets
+        if self.settings is None:
+            raise RuntimeError("Settings are not loaded")
+        settings = self.settings
         self.redis_client = Redis(
-            host=secrets.REDIS_HOST,
-            port=int(secrets.REDIS_PORT),
-            username=secrets.REDIS_USERNAME,
-            password=secrets.REDIS_ACCESS_KEY,
-            db=int(secrets.REDIS_DB),
+            host=settings.redis_host,
+            port=settings.redis_port,
+            username=settings.redis_username,
+            password=settings.redis_access_key,
+            db=settings.redis_db,
             decode_responses=False,
             ssl=True,
             socket_connect_timeout=5,
@@ -134,7 +128,7 @@ class LangGraphProcess:
 
         # Store 
         store_cm = AsyncPostgresStore.from_conn_string(
-            conn_string=secrets.POSTGRES_CONN_STRING,
+            conn_string=settings.postgres_conn_string,
             pool_config=PoolConfig(
                 min_size=1,
                 max_size=5,
@@ -153,7 +147,7 @@ class LangGraphProcess:
                 "refresh_on_read": True, 
             },
             index={
-                "dims": int(secrets.AZURE_OPENAI_EMBEDDING_DIMS),
+                "dims": settings.azure_openai_embedding_dims,
                 "embed": self.embedding_model,
             }
         )
@@ -185,73 +179,67 @@ class LangGraphProcess:
             store=self.store,
         )
 
-    async def _load_secrets(self) -> None:
-        self.secret_client, self.secret_credential = create_async_secret_client(
-            self.vault_url
-        )
-
-        assert self.secret_client is not None
-        self.secrets = await load_app_secrets(self.secret_client)
+    def _load_settings(self) -> None:
+        self.settings = load_graph_settings()
 
     def _load_instance(self) -> None:
-        # Load Secrets
-        if self.secrets is None:
-            raise RuntimeError("Secrets are not loaded")
-        secrets = self.secrets
+        # Load Settings
+        if self.settings is None:
+            raise RuntimeError("Settings are not loaded")
+        settings = self.settings
 
         # Initialize Blob Container Client
         self.BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
-            conn_str=secrets.BLOB_CONNECTION_STRING,
+            conn_str=settings.blob_connection_string,
             container_name="prompts",
         )
         self.FILES_BLOB_CONTAINER_CLIENT = ContainerClient.from_connection_string(
-            conn_str=secrets.BLOB_CONNECTION_STRING,
+            conn_str=settings.blob_connection_string,
             container_name="files",
         )
         self.agent_file_repository = AgentFileRepository(
-            conn_string=secrets.POSTGRES_WEB_CONN_STRING,
+            conn_string=settings.postgres_web_conn_string,
         )
-
 
         # Initialize Azure OpenAI Models
         self.main_model = ChatOpenAI(
-            model=secrets.AZURE_OPENAI_MAIN_MODEL,
-            base_url=f"{secrets.AZURE_OPENAI_ENDPOINT.rstrip('/')}/openai/v1/",
-            api_key=secrets.AZURE_OPENAI_API_KEY,
+            model=settings.azure_openai_main_model,
+            base_url=f"{settings.azure_openai_endpoint.rstrip('/')}/openai/v1/",
+            api_key=settings.azure_openai_api_key,
             use_responses_api=True,
             stream_usage=True,
-            timeout=int(secrets.AZURE_OPENAI_MAIN_MODEL_TIMEOUT),
+            timeout=settings.azure_openai_main_model_timeout,
         )
         self.small_model = AzureChatOpenAI(
-            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
-            api_key=secrets.AZURE_OPENAI_API_KEY,
-            api_version=secrets.AZURE_OPENAI_API_VERSION,
-            azure_deployment=secrets.AZURE_OPENAI_SMALL_MODEL,
-            tiktoken_model_name=secrets.AZURE_OPENAI_SMALL_MODEL,
-            model=secrets.AZURE_OPENAI_SMALL_MODEL,
+            azure_endpoint=settings.azure_openai_endpoint,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
+            azure_deployment=settings.azure_openai_small_model,
+            tiktoken_model_name=settings.azure_openai_small_model,
+            model=settings.azure_openai_small_model,
             streaming=True,
             stream_usage=False,
-            request_timeout=int(secrets.AZURE_OPENAI_SMALL_MODEL_TIMEOUT),
+            request_timeout=settings.azure_openai_small_model_timeout,
         )
         self.embedding_model = AzureOpenAIEmbeddings(
-            azure_endpoint=secrets.AZURE_OPENAI_ENDPOINT,
-            api_key=secrets.AZURE_OPENAI_API_KEY,
-            api_version=secrets.AZURE_OPENAI_API_VERSION,
-            azure_deployment=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
-            model=secrets.AZURE_OPENAI_EMBEDDING_MODEL,
+            azure_endpoint=settings.azure_openai_endpoint,
+            api_key=settings.azure_openai_api_key,
+            api_version=settings.azure_openai_api_version,
+            azure_deployment=settings.azure_openai_embedding_model,
+            model=settings.azure_openai_embedding_model,
         )
         
         # Initialize Azure AI Search Vectorstore
         self.azure_search = AzureSearch(
-            azure_search_endpoint=secrets.AZURE_AI_SEARCH_ENDPOINT,
-            azure_search_key=secrets.AZURE_AI_SEARCH_API_KEY,
-            index_name=secrets.AZURE_AI_SEARCH_INDEX_NAME,
+            azure_search_endpoint=settings.azure_ai_search_endpoint,
+            azure_search_key=settings.azure_ai_search_api_key,
+            index_name=settings.azure_ai_search_index_name,
             embedding_function=self.embedding_model,
             search_type="semantic_hybrid",
-            semantic_configuration_name=secrets.AZURE_AI_SEARCH_SEMANTIC_CONFIG,
-            vector_search_dimensions=int(secrets.AZURE_OPENAI_EMBEDDING_DIMS),
+            semantic_configuration_name=settings.azure_ai_search_semantic_config,
+            vector_search_dimensions=settings.azure_openai_embedding_dims,
             additional_search_client_options={
-                "api_version": secrets.AZURE_AI_SEARCH_API_VERSION,
+                "api_version": settings.azure_ai_search_api_version,
             },
         )
 
@@ -509,31 +497,6 @@ class LangGraphProcess:
 
             self.azure_search = None
 
-        # Cleanup Key Vault Client
-        secret_client = getattr(self, "secret_client", None)
-        if secret_client is not None:
-            try:
-                close = getattr(secret_client, "close", None)
-                if callable(close):
-                    maybe = close()
-                    if inspect.isawaitable(maybe):
-                        await maybe
-            except Exception as exc:
-                logger.warning("[graph.py] Failed to close Key Vault client: %s", exc)
-            self.secret_client = None
-
-        secret_credential = getattr(self, "secret_credential", None)
-        if secret_credential is not None:
-            try:
-                close = getattr(secret_credential, "close", None)
-                if callable(close):
-                    maybe = close()
-                    if inspect.isawaitable(maybe):
-                        await maybe
-            except Exception as exc:
-                logger.warning("[graph.py] Failed to close Key Vault credential: %s", exc)
-            self.secret_credential = None
-
     def _build_graph(self, checkpointer=None, store=None):
         """
         Build and return the deep agent runnable.
@@ -544,20 +507,20 @@ class LangGraphProcess:
         Returns:
             Runnable: Deep agent runnable
         """
-        # Load Secret
-        if self.secrets is None:
-            raise RuntimeError("Secrets are not loaded")
-        secrets = self.secrets
+        # Load Settings
+        if self.settings is None:
+            raise RuntimeError("Settings are not loaded")
+        settings = self.settings
 
         # Create Azure AI Search retriever tool
         azure_ai_search = create_azure_ai_search_tool(
             azure_ai_search=self.azure_search,
-            top_k=int(secrets.AZURE_AI_SEARCH_TOP_K),
+            top_k=settings.azure_ai_search_top_k,
         )
         
         # Create Azure Dynamic Sessions Python REPL tool
         python_repl_tool = create_python_repl_tool(
-            pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT
+            pool_management_endpoint=settings.azure_dynamic_sessions_python_pool_endpoint
         )
 
         # Create Web Search Tool (Grounding with bing search)
@@ -578,7 +541,7 @@ class LangGraphProcess:
             system_prompt=self.prompt_cache["sandbox_agent.yaml"],
             middleware=[
                 SessionsFileSyncMiddleware(
-                    pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
+                    pool_management_endpoint=settings.azure_dynamic_sessions_bash_pool_endpoint,
                     blob_container_client=self.FILES_BLOB_CONTAINER_CLIENT,
                     file_repository=self.agent_file_repository,
                 )
@@ -588,7 +551,7 @@ class LangGraphProcess:
             store=store,
             backend=lambda rt: CompositeBackend(
                 default=MultimodalSessionsBashBackend(
-                    pool_management_endpoint=secrets.AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT,
+                    pool_management_endpoint=settings.azure_dynamic_sessions_bash_pool_endpoint,
                     session_id=f"sandbox-{rt.context.user_id}-{rt.context.thread_id}",
                 ),
                 routes={}
@@ -617,12 +580,12 @@ class LangGraphProcess:
                 
                 # Content Safety Middleware
                 azure_content_moderation_middleware(
-                    endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
-                    credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
+                    endpoint=settings.azure_ai_content_safety_endpoint,
+                    credential=settings.azure_ai_content_safety_api_key,
                 ),
                 azure_prompt_shield_middleware(
-                    endpoint=secrets.AZURE_AI_CONTENT_SAFETY_ENDPOINT,
-                    credential=secrets.AZURE_AI_CONTENT_SAFETY_API_KEY,
+                    endpoint=settings.azure_ai_content_safety_endpoint,
+                    credential=settings.azure_ai_content_safety_api_key,
                 )
             ],
             subagents=[
