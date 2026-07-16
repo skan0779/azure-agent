@@ -569,7 +569,7 @@ azure-agent/
 | Stream Management(Job/Worker) | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
 | Real-time interaction | [Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
-| Secret Management  | Azure Container Apps secret references | Azure Key Vault |
+| Secret Management  | [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general) | Azure Key Vault |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
 | Authentication | [MSAL/JWT](https://learn.microsoft.com/ko-kr/entra/msal/python/) | Microsoft Entra ID, App Registration  |
 | Observability | [Langfuse](https://github.com/langfuse/langfuse) | Azure Virutal Machine or Azure Kubernetes Service, ... |
