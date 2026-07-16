@@ -550,7 +550,7 @@ azure-agent/
 
 | Category | Library | Resource |
 | --- | --- | --- |
-| RAG | [Azure Search](https://docs.langchain.com/oss/python/integrations/vectorstores/azuresearch) | Azure AI Search |
+| RAG | [Azure AI Search](https://learn.microsoft.com/en-us/azure/search) | Azure AI Search |
 | Web Search | [Web search](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/web-search) | Azure OpenAI (Grounding with Bing Search) |
 | Sandbox Environment | [SessionsBashBackend](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (shell) |
 | Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (python) |
