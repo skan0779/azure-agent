@@ -27,10 +27,270 @@
 ---
 
 ## Quickstart
-> Required and optional steps to start the service.
+> Recommended Terraform-first deployment flow. For the full resource inventory, see [Azure Resources](#azure-resources).
+> Helper scripts read Terraform outputs automatically. For script options, see [`scripts/README.md`](./scripts/README.md).
 
 <details>
-<summary>1. Provision Azure Resources</summary>
+<summary>1. Provision Base Azure Resources</summary>
+
+> The first Terraform apply creates the shared Azure resources only. Container Apps and the migration job are deployed later, after images, secrets, Langfuse, and auth settings are ready.
+
+1.1 Configure Terraform variables
+```bash
+cd environments/infra
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Keep runtime services disabled for the first apply:
+```hcl
+deploy_container_apps    = false
+deploy_container_app_job = false
+```
+
+Optionally enable Azure OpenAI model deployments if your subscription and region support the configured models:
+```hcl
+create_openai_deployments = true
+```
+
+1.2 Apply base infrastructure
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+1.3 Review Terraform outputs
+```bash
+terraform output
+```
+
+The following steps use these outputs directly or through helper scripts.
+
+</details>
+
+<details>
+<summary>2. Deploy Langfuse on Azure VM</summary>
+
+> For demo use, Langfuse can be self-hosted on an Azure VM. For enterprise production use, we recommend running Langfuse on Kubernetes with managed dependencies, backups, monitoring, and network controls.
+
+Use the optional Langfuse VM Terraform stack:
+```bash
+cd ../langfuse-vm
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Set `resource_group_name` to the output from the base infrastructure stack, and restrict access with `allowed_source_ip_ranges`:
+```hcl
+resource_group_name       = "<core-resource-group-name>"
+allowed_source_ip_ranges = ["<your-client-ip>/32"]
+```
+
+Deploy the VM:
+```bash
+terraform init
+terraform plan
+terraform apply
+```
+
+Then follow the Langfuse VM guide to install Docker, start Langfuse, and create API keys:
+- [`environments/langfuse-vm/README.md`](./environments/langfuse-vm/README.md)
+
+Capture the Langfuse URL:
+```bash
+terraform output -raw langfuse_url
+```
+
+Store the generated public and secret keys as `LANGFUSE-PUBLIC-KEY` and `LANGFUSE-SECRET-KEY` during the secrets step. Use the `langfuse_url` output later as `LANGFUSE_BASE_URL` in `worker_extra_env`.
+
+Return to the repository root for the remaining steps:
+```bash
+cd ../..
+```
+
+</details>
+
+<details>
+<summary>3. Configure App Registrations</summary>
+
+> Create Microsoft Entra App Registrations for `azure-agent-ui` sign-in and `azure-agent-web` JWT access token validation. These values are needed before deploying `azure-agent-web`.
+
+Create two single-tenant app registrations:
+
+- `azure-agent-web-api`: expose an API scope named `access_as_user`.
+- `azure-agent-ui`: set the redirect URI to `https://<your-static-web-app-domain>` and grant delegated permission to `azure-agent-web-api/access_as_user`.
+
+Capture these values for the runtime Terraform apply and UI deployment:
+```env
+AZURE_AUTH_TENANT_ID=<your-directory-tenant-id>
+AZURE_AUTH_API_CLIENT_ID=<your-api-app-registration-client-id>
+AZURE_AUTH_REQUIRED_SCOPE=access_as_user
+NEXT_PUBLIC_AZURE_TENANT_ID=<your-directory-tenant-id>
+NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
+NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
+```
+
+</details>
+
+<details>
+<summary>4. Configure Azure Key Vault Secrets</summary>
+
+> Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. Terraform creates the Key Vault and wires Container App secret references, but it does not write application secret values to avoid storing them in Terraform state.
+
+Naming convention:
+- Key Vault secret name: `AZURE-OPENAI-API-KEY`
+- Container App secret key: `azure-openai-api-key`
+- Runtime environment variable: `AZURE_OPENAI_API_KEY`
+
+Bootstrap the required secrets:
+```bash
+scripts/bootstrap-secrets.sh --infra-dir environments/infra
+```
+
+The script reads Terraform outputs, fetches Azure resource keys where possible, prompts for values that cannot be inferred, and writes all required application secrets to Key Vault.
+It requires `terraform`, `az`, and `jq`.
+
+For more details, see:
+- [`environments/env/.env.keyvault`](./environments/env/.env.keyvault)
+- [`environments/env/README.md`](./environments/env/README.md)
+
+</details>
+
+<details>
+<summary>5. Configure Azure AI Search</summary>
+
+Create the Azure AI Search index and upload sample documents.
+
+> This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In production, replace it with your own schema and data. For more details, see [`examples/azure_ai_search/README.md`](./examples/azure_ai_search/README.md).
+
+```bash
+scripts/setup-azure-ai-search.sh --infra-dir environments/infra
+```
+
+</details>
+
+<details>
+<summary>6. Configure Blob Storage Prompts</summary>
+
+Upload prompt files to Azure Blob Storage.
+
+> The repository includes example prompt files. For production use, replace them with your own files using the same blob names.
+
+```bash
+scripts/upload-prompts.sh --infra-dir environments/infra
+```
+
+</details>
+
+<details>
+<summary>7. Build and Push Container Images</summary>
+
+> For more details, see [`environments/deploy/README.md`](./environments/deploy/README.md).
+
+Build and push the Python runtime image and the web image.
+```bash
+scripts/build-push-images.sh --infra-dir environments/infra
+```
+
+</details>
+
+<details>
+<summary>8. Deploy Runtime Services</summary>
+
+> The second Terraform apply creates `azure-agent-api`, `azure-agent-worker`, `azure-agent-web`, and `azure-agent-job`. Container App secret references are created from the Key Vault references defined in Terraform.
+
+Before applying, update `terraform.tfvars`:
+```hcl
+deploy_container_apps    = true
+deploy_container_app_job = true
+
+worker_extra_env = {
+  LANGFUSE_BASE_URL = "<terraform-output-langfuse-url>"
+}
+
+web_extra_env = {
+  AZURE_AUTH_TENANT_ID       = "<your-directory-tenant-id>"
+  AZURE_AUTH_API_CLIENT_ID   = "<your-api-app-registration-client-id>"
+  AZURE_AUTH_REQUIRED_SCOPE  = "access_as_user"
+}
+```
+
+Apply runtime infrastructure:
+```bash
+cd environments/infra
+terraform plan
+terraform apply
+```
+
+Run the migration job after it is created:
+```bash
+az containerapp job start \
+  --resource-group "$(terraform output -raw resource_group_name)" \
+  --name "$(terraform output -json resource_names | jq -r .container_app_job)"
+```
+
+Return to the repository root:
+```bash
+cd ../..
+```
+
+</details>
+
+<details>
+<summary>9. Deploy UI</summary>
+
+> Terraform creates the Azure Static Web Apps resource. The UI still needs a GitHub Actions deployment. For more details, see [`apps/README.md`](./apps/README.md).
+
+Set the GitHub Actions secret:
+```env
+AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
+```
+
+You can get the deployment token from Terraform:
+```bash
+terraform -chdir=environments/infra output -raw static_web_app_api_key
+```
+
+You can get the web URL from Terraform:
+```bash
+terraform -chdir=environments/infra output -json container_app_urls | jq -r .web
+```
+
+Set the GitHub Actions variables:
+```env
+NEXT_PUBLIC_AGENT_WEB_URL=<azure-agent-web-application-url>
+NEXT_PUBLIC_AZURE_TENANT_ID=<your-directory-tenant-id>
+NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
+NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
+```
+
+Deploy via GitHub Actions:
+```bash
+git push origin main
+```
+
+</details>
+
+<details>
+<summary>10. Check Service Status</summary>
+
+> For more details, see [`README.md`](./src/azure_agent/api/README.md).
+
+Check `azure-agent-api`:
+- `https://<azure-agent-api-url>/agent/api/ping`
+- `https://<azure-agent-api-url>/agent/api/health`
+- `https://<azure-agent-api-url>/agent/swagger`
+
+Check `azure-agent-web`:
+- `https://<azure-agent-web-url>/health`
+
+Check `azure-agent-ui`:
+- `https://<azure-agent-ui-url>`
+
+</details>
+
+---
+
+## Azure Resources
 
 | Resource | Notes |
 | --- | --- |
@@ -42,465 +302,19 @@
 | Azure Managed Redis (OSS) | - |
 | Azure Database for PostgreSQL | - |
 | Azure Storage Account (Blob) | Create `files`, `prompts` container |
-| Azure Container Registry | - |
-| Azure Container Apps Environment | - |
 | Azure Container Apps | Deploy `azure-agent-api` service |
 | Azure Container Apps | Deploy `azure-agent-worker` service |
 | Azure Container Apps | Deploy `azure-agent-web` service |
+| Azure Container Apps Environment | - |
+| Azure Container Registry | - |
 | Azure Static Web Apps | Deploy `azure-agent-ui` service |
+| Azure Virtual Machines | Deploy `langfuse` service |
 | Azure Container App Job | Trigger type: `Manual`, Run `azure-agent-job` |
 | Azure Container Apps Session Pool | Pool type: `Python` |
 | Azure Container Apps Session Pool | Pool type: `Shell` |
 | App Registrations | Register `azure-agent-ui`,`azure-agent-web-api` |
 | Azure Key Vault | [Generate Secrets](./environments/env/README.md) |
 | Log Analytics Workspace | - |
-
-</details>
-
-<details>
-<summary>2. Create an Azure AI Search index</summary>
-
-> This repository provides an example Azure AI Search configuration using Microsoft Learn documentation as a sample RAG data source. In practice, adapt your own data. For more details, see [`README.md`](./examples/azure_ai_search/README.md).
-
-2.1 Create index schema and Upload index documents
-```bash
-uv run python examples/azure_ai_search/create_index.py
-
-uv run python examples/azure_ai_search/create_document.py
-```
-
-</details>
-
-<details>
-<summary>3. Upload prompt files to Azure Blob Storage (optional)</summary>
-
-> This repository provides an example system prompt in [`main_agent.yaml`](.src/azure_agent/prompts/main_agent.yaml) and [`sandbox_agent.yaml`](.src/azure_agent/prompts/sandbox_agent.yaml). For production use, replace it with your own system prompt with same filename. For more details, see [`README.md`](./src/azure_agent/prompts/README.md).
-
-3.1 Upload `main_agent.yaml` prompt file to blob container
-```bash
-az storage blob upload \
-  --connection-string "<your-blob-connection-string>" \
-  --container-name "<your-blob-container-name>" \
-  --file src/azure_agent/prompts/main_agent.yaml \
-  --name main_agent.yaml \
-  --overwrite
-```
-
-3.2 Upload `sandbox_agent.yaml` prompt file to blob container
-```bash
-az storage blob upload \
-  --connection-string "<your-blob-connection-string>" \
-  --container-name "<your-blob-container-name>" \
-  --file src/azure_agent/prompts/sandbox_agent.yaml \
-  --name sandbox_agent.yaml \
-  --overwrite
-```
-
-</details>
-
-<details>
-<summary>4. Deploy Langfuse</summary>
-
-> For demo use, Langfuse can be self-hosted on an Azure VM. For enterprise production use, we recommend running Langfuse on Kubernetes with managed dependencies, backups, monitoring, and network controls.
-
-**4.1 Create an Azure Virtual Machine**
-```bash
-az vm create \
-  --resource-group "<your-resource-group>" \
-  --name "<your-langfuse-vm-name>" \
-  --image Ubuntu2404 \
-  --size Standard_D4s_v5 \
-  --admin-username azureuser \
-  --generate-ssh-keys \
-  --public-ip-sku Standard
-```
-
-**4.2 Configure NSG rules**
-```bash
-az network nsg rule create \
-  --resource-group "<your-resource-group>" \
-  --nsg-name "<your-vm-nsg-name>" \
-  --name AllowSshFromClientIp \
-  --priority 100 \
-  --direction Inbound \
-  --access Allow \
-  --protocol Tcp \
-  --source-address-prefixes "<your-client-ip>/32" \
-  --destination-port-ranges 22
-
-az network nsg rule create \
-  --resource-group "<your-resource-group>" \
-  --nsg-name "<your-vm-nsg-name>" \
-  --name AllowLangfuseFromClientIp \
-  --priority 110 \
-  --direction Inbound \
-  --access Allow \
-  --protocol Tcp \
-  --source-address-prefixes "<your-client-ip>/32" \
-  --destination-port-ranges 3000
-```
-
-**4.3 SSH into the VM**
-```bash
-ssh -i ~/.ssh/id_rsa azureuser@<vm-public-ip>
-```
-
-**4.4 Install Docker in VM**
-```bash
-sudo apt-get update
-sudo apt-get install -y ca-certificates curl git
-
-sudo install -m 0755 -d /etc/apt/keyrings
-
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-  -o /etc/apt/keyrings/docker.asc
-
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-sudo apt-get update
-sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-**4.5 Deploy Langfuse in VM**
-```bash
-git clone https://github.com/langfuse/langfuse.git
-cd langfuse
-
-# Generate values for Langfuse deployment secrets.
-openssl rand -base64 32
-openssl rand -hex 32
-
-docker compose up -d
-docker compose ps
-```
-
-**4.6 Create Langfuse API keys**
-Open Langfuse in your browser:
-```txt
-http://<vm-public-ip>:3000
-```
-
-Create an organization and project, then create a new API key from the project settings.
-Store these values in Azure Key Vault Secrets:
-```env
-LANGFUSE-PUBLIC-KEY=<your-langfuse-public-key>
-LANGFUSE-SECRET-KEY=<your-langfuse-secret-key>
-```
-
-</details>
-
-<details>
-<summary>5. Configure Azure Key Vault Secrets</summary>
-
-> Store the values defined in [`.env.keyvault`](./environments/env/.env.keyvault) as secrets in Azure Key Vault. Container Apps should not read Key Vault directly at runtime. Add Key Vault references under **Security > Secrets**, then inject those values into container environment variables with `secretref`. For more details, see [`README.md`](./environments/env/README.md).
-
-Naming convention:
-- Key Vault secret name: `AZURE-OPENAI-API-KEY`
-- Container App secret key: `azure-openai-api-key`
-- Runtime environment variable: `AZURE_OPENAI_API_KEY`
-
-5.1 Set the Key Vault Secrets
-```bash
-az keyvault secret set \
-  --vault-name "<your-key-vault-name>" \
-  --name "<secret-name>" \
-  --value "<secret-value>"
-```
-
-</details>
-
-<details>
-<summary>6. Build and Push Docker Image to Azure Container Registry</summary>
-
-> For more details, see [`README.md`](./environments/deploy/README.md).
-
-6.1 Build and push `azure-agent-api`, `azure-agent-worker`, `azure-agent-job` docker image
-```bash
-az login
-
-az acr login -n "<your-acr-name>"
-
-docker buildx build \
-  --platform linux/amd64 \
-  --provenance=false \
-  -f environments/deploy/Dockerfile \
-  -t "<your-acr-name>".azurecr.io/azure-agent:local \
-  --push .
-```
-
-6.2 Build and push `azure-agent-web` docker image
-```bash
-docker buildx build \
-  --platform linux/amd64 \
-  --provenance=false \
-  -f apps/azure-agent-web/Dockerfile \
-  -t "<your-acr-name>".azurecr.io/azure-agent-web:local \
-  --push .
-```
-
-</details>
-
-<details>
-<summary>7. Run Azure Container App Job</summary>
-
-**7.1 Create `azure-agent-job` container app job**
-- Image source: Azure Container Registry
-- Managed identity: System assigned Identity (environment)
-- Command override: `sh`
-- Arguments override: `-lc, uv run --no-sync alembic upgrade head`
-
-**7.2 Configure and Run `azure-agent-job` container app job**
-- Settings > Identity > System assigned: ✅
-- Settings > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
-- Settings > Secrets:
-```txt
-Key: postgres-web-conn-string
-Type: Key Vault reference
-Key Vault secret URL: https://<your-key-vault-name>.vault.azure.net/secrets/POSTGRES-WEB-CONN-STRING
-Managed identity: System assigned
-```
-- Application > Containers > Environment variables:
-```env
-POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
-```
-- Overview > ▶︎ Run now
-
-</details>
-
-<details>
-<summary>8. Deploy and Configure an Azure Container Apps</summary>
-
-> For more details, see [`README.md`](./environments/env/README.md).
-
-**8.1 Deploy `azure-agent-api`**
-- Ingress : ✅
-- Target port : 8080
-- Security > Identity > System assigned: ✅
-- Security > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
-- Security > Secrets:
-```txt
-Add the required secrets from ./environments/env/.env.keyvault as Key Vault references.
-
-Example:
-Key: azure-openai-endpoint
-Type: Key Vault reference
-Key Vault secret URL: https://<your-key-vault-name>.vault.azure.net/secrets/AZURE-OPENAI-ENDPOINT
-Managed identity: System assigned
-```
-- Application > Scale > Min replicas: 1
-- Application > Containers > Environment variables:
-```env
-# Secret references
-BLOB_CONNECTION_STRING=secretref:blob-connection-string
-POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
-REDIS_STREAM_HOST=secretref:redis-stream-host
-REDIS_STREAM_USERNAME=secretref:redis-stream-username
-REDIS_STREAM_ACCESS_KEY=secretref:redis-stream-access-key
-REDIS_STREAM_PORT=secretref:redis-stream-port
-
-# Plain values
-SSE_MAX_CONNECTION_SECONDS=600 # 10 minutes
-JOB_TTL_SECONDS=86400 # 1 day
-EVENT_TTL_SECONDS=86400 # 1 day
-IDEMPOTENCY_TTL_SECONDS=86400 # 1 day
-SESSION_TTL_SECONDS=3600 # 1 hour
-SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
-SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
-```
-
-**8.2 Deploy `azure-agent-worker`**
-- Ingress : ❎
-- Command override: `sh`
-- Arguments override: `-lc, uv run azure-agent-worker`
-- Security > Identity > System assigned: ✅
-- Security > Identity > Azure role assignments: `Key Vault Secrets User`, `Storage Blob Data Reader`, `ACR Pull`, `Azure ContainerApps Session Executor`
-- Security > Secrets:
-```txt
-Add the required secrets from ./environments/env/.env.keyvault as Key Vault references.
-
-Example:
-Key: azure-openai-endpoint
-Type: Key Vault reference
-Key Vault secret URL: https://<your-key-vault-name>.vault.azure.net/secrets/AZURE-OPENAI-ENDPOINT
-Managed identity: System assigned
-```
-- Application > Scale > Min replicas: 1
-- Application > Containers > Environment variables:
-```env
-# Secret references
-AZURE_OPENAI_ENDPOINT=secretref:azure-openai-endpoint
-AZURE_OPENAI_API_KEY=secretref:azure-openai-api-key
-AZURE_OPENAI_API_VERSION=secretref:azure-openai-api-version
-AZURE_OPENAI_MAIN_MODEL=secretref:azure-openai-main-model
-AZURE_OPENAI_MAIN_MODEL_TIMEOUT=secretref:azure-openai-main-model-timeout
-AZURE_OPENAI_SMALL_MODEL=secretref:azure-openai-small-model
-AZURE_OPENAI_SMALL_MODEL_TIMEOUT=secretref:azure-openai-small-model-timeout
-AZURE_OPENAI_EMBEDDING_MODEL=secretref:azure-openai-embedding-model
-AZURE_OPENAI_EMBEDDING_DIMS=secretref:azure-openai-embedding-dims
-AZURE_AI_SEARCH_ENDPOINT=secretref:azure-ai-search-endpoint
-AZURE_AI_SEARCH_API_KEY=secretref:azure-ai-search-api-key
-AZURE_AI_SEARCH_INDEX_NAME=secretref:azure-ai-search-index-name
-AZURE_AI_SEARCH_SEMANTIC_CONFIG=secretref:azure-ai-search-semantic-config
-AZURE_AI_SEARCH_API_VERSION=secretref:azure-ai-search-api-version
-AZURE_AI_SEARCH_TOP_K=secretref:azure-ai-search-top-k
-AZURE_AI_CONTENT_SAFETY_ENDPOINT=secretref:azure-ai-content-safety-endpoint
-AZURE_AI_CONTENT_SAFETY_API_KEY=secretref:azure-ai-content-safety-api-key
-AZURE_DYNAMIC_SESSIONS_PYTHON_POOL_ENDPOINT=secretref:azure-dynamic-sessions-python-pool-endpoint
-AZURE_DYNAMIC_SESSIONS_BASH_POOL_ENDPOINT=secretref:azure-dynamic-sessions-bash-pool-endpoint
-BLOB_CONNECTION_STRING=secretref:blob-connection-string
-REDIS_HOST=secretref:redis-host
-REDIS_USERNAME=secretref:redis-username
-REDIS_ACCESS_KEY=secretref:redis-access-key
-REDIS_PORT=secretref:redis-port
-REDIS_DB=secretref:redis-db
-REDIS_STREAM_HOST=secretref:redis-stream-host
-REDIS_STREAM_USERNAME=secretref:redis-stream-username
-REDIS_STREAM_ACCESS_KEY=secretref:redis-stream-access-key
-REDIS_STREAM_PORT=secretref:redis-stream-port
-POSTGRES_CONN_STRING=secretref:postgres-conn-string
-POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
-LANGFUSE_PUBLIC_KEY=secretref:langfuse-public-key
-LANGFUSE_SECRET_KEY=secretref:langfuse-secret-key
-
-# Plain values
-LANGFUSE_BASE_URL=http://<your-langfuse-base-url>:3000
-JOB_TTL_SECONDS=86400 # 1 day
-EVENT_TTL_SECONDS=86400 # 1 day
-IDEMPOTENCY_TTL_SECONDS=86400 # 1 day
-SESSION_TTL_SECONDS=3600 # 1 hour
-SESSION_RESERVATION_TTL_SECONDS=300 # 5 minutes
-SESSION_LOCK_TTL_SECONDS=90 # 1.5 minutes
-WORKER_HEARTBEAT_INTERVAL_SECONDS=15 # 15 seconds
-WORKER_PENDING_CLAIM_IDLE_MS=300000 # 5 minutes
-WORKER_PENDING_CLAIM_COUNT=2 # 2 entries per reclaim cycle
-WORKER_READ_BLOCK_MS=10000 # 10 seconds
-WORKER_READ_COUNT=1 # 1 entry per read
-```
-
-**8.3 Deploy `azure-agent-web`**
-- Ingress : ✅
-- Target port : 3001
-- Security > Identity > System assigned: ✅
-- Security > Identity > Azure role assignments: `Key Vault Secrets User`, `ACR Pull`
-- Security > Secrets:
-```txt
-Add the required secrets from ./environments/env/.env.keyvault as Key Vault references.
-
-Example:
-Key: azure-openai-endpoint
-Type: Key Vault reference
-Key Vault secret URL: https://<your-key-vault-name>.vault.azure.net/secrets/AZURE-OPENAI-ENDPOINT
-Managed identity: System assigned
-```
-- Application > Scale > Min replicas: 1
-- Application > Containers > Environment variables:
-```env
-# Secret references
-POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
-
-# Plain values
-AGENT_API_BASE_URL=<your-azure-agent-api-url>
-CORS_ORIGINS=https://<your-static-web-app-domain>
-AZURE_AUTH_TENANT_ID=<your-directory-tenant-id>
-AZURE_AUTH_API_CLIENT_ID=<your-api-app-registration-client-id>
-AZURE_AUTH_REQUIRED_SCOPE=access_as_user
-HOST=0.0.0.0
-PORT=3001
-```
----
-
-</details>
-
-<details>
-<summary>9. Register App Registrations</summary>
-
-> Create Microsoft Entra App Registrations for `azure-agent-ui` sign-in and `azure-agent-web` JWT access token validation.
-
-**9.1 Register `azure-agent-web-api`**
-- Name: azure-agent-web-api
-- Supported account types: Single tenant only
-
-**9.2 Configure `azure-agent-web-api`**
-- Manage > Expose an API > Application ID URI: `add`
-- Manage > Expose an API > Add a scope : 
-```text
-`scope name`: access_as_user
-`Who can consent`: Admins and users 
-`Admin consent display name`: Access azure-agent API
-`Admin consent description`: Allows the app to access azure-agent API on behalf of the signed-in user.
-`User consent display name`: Access azure-agent API
-`User consent description`: Allows the app to access azure-agent API on your behalf.
-`State`: Enabled
-```
-
-**9.3 Register `azure-agent-ui`**
-- Name: azure-agent-ui
-- Supported account types: Single tenant only
-- Redirect URI: https://<your-static-web-app-domain>
-
-**9.4 Configure `azure-agent-ui`**
-- Manage > API Permissions > Add a permission > My APIs > `azure-agent-web-api`:
-```text
-`type of permissions`: Delegated permissions
-`permissions`: access_as_user
-```
-
-</details>
-
-<details>
-<summary>10. Deploy and Configure an Azure Static Web Apps</summary>
-
-> For more details, see [`README.md`](./apps/README.md).
-
-**10.1 Deploy `azure-agent-ui`**
-- Source: Other
-- Deployment authorization policy: Deployment Token
-
-**10.2 Setting Github Actions secret and variables (Repository > Settings > Secrets and variables > Actions)**
-- New repository secret: 
-```env
-AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
-```
-- New repository variables:
-```env
-NEXT_PUBLIC_AGENT_WEB_URL=<azure-agent-web-application-url>
-NEXT_PUBLIC_AZURE_TENANT_ID=<your-directory-tenant-id>
-NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
-NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
-```
-
-**10.3 Deploy `azure-agent-ui` via github workflow**
-```bash
-git push origin main
-```
-
-</details>
-
-<details>
-<summary>11. Check Service Status (optional)</summary>
-
-> For more details, see [`README.md`](./src/azure_agent/api/README.md).
-
-**11.1 Check `azure-agent-api` status:**
-- `https://<azure-agent-api-url>/agent/api/ping`
-- `https://<azure-agent-api-url>/agent/api/health`
-- `https://<azure-agent-api-url>/agent/swagger`
-
-**11.2 Check `azure-agent-web` status:**
-- `https://<azure-agent-web-url>/health`
-
-**11.3 Check `azure-agent-ui` status:**
-- `https://<azure-agent-ui-url>`
-
-</details>
 
 ---
 
@@ -516,9 +330,11 @@ azure-agent/
 ├── environments/
 │   ├── deploy/                # Docker files
 │   ├── env/                   # Key Vault secret template and setup notes
-│   └── infra/                 # Terraform templates (public network ver.)
+│   ├── infra/                 # Core Terraform templates (public network ver.)
+│   └── langfuse-vm/           # Optional Langfuse VM Terraform stack
 ├── examples/
 │   └── azure_ai_search/       # Azure AI Search indexing and retrieval examples
+├── scripts/                   # Deployment helper scripts
 ├── src/
 │   └── azure_agent/
 │       ├── api/               # FastAPI server
@@ -556,23 +372,23 @@ azure-agent/
 | Code Interpreter | [SessionsPythonREPLTool](https://learn.microsoft.com/en-us/azure/container-apps/sessions) | Azure Container Apps Session Pool (python) |
 | Short-term Memory | [AsyncShallowRedisSaver](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-redis-checkpointer) | Azure Managed Redis (Enterprise) |
 | Long-term Memory | [AsyncPostgresStore](https://docs.langchain.com/oss/python/langgraph/add-memory#example-using-postgres-store), [MemoryMiddleware](https://docs.langchain.com/oss/python/deepagents/memory) | Azure Database for PostgreSQL |
-| Skiils | [SkillsMiddleware](https://docs.langchain.com/oss/python/deepagents/skills) | Azure Database for PostgreSQL |
+| Skills | [SkillsMiddleware](https://docs.langchain.com/oss/python/deepagents/skills) | Azure Database for PostgreSQL |
 | Context Management | [SummarizationMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/summarization/SummarizationMiddleware) | Azure OpenAI |
 | Agent Orchestration | [SubAgentMiddleware](https://reference.langchain.com/python/deepagents/middleware/subagents/SubAgentMiddleware) | - |
 | Task Management | [TodoListMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/todo/TodoListMiddleware) | Azure Managed Redis (Enterprise) |
 | File Management | [FilesystemMiddleware](https://reference.langchain.com/python/deepagents/middleware/filesystem/FilesystemMiddleware) | Azure Database for PostgreSQL |
 | Rate Limiting | [ModelCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/model_call_limit/ModelCallLimitMiddleware), [ToolCallLimitMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/tool_call_limit/ToolCallLimitMiddleware) | - |
 | Content Moderation | [AzureContentModerationMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
-| Prompt Sheild | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
+| Prompt Shield | [AzurePromptShieldMiddleware](https://learn.microsoft.com/en-us/azure/foundry/how-to/develop/langchain-middleware) | Azure AI Content Safety |
 | PII | [PIIMiddleware](https://reference.langchain.com/python/langchain/agents/middleware/pii/PIIMiddleware) | - |
 | Session Management | [Session Manager(Custom)](./src/azure_agent/session/README.md) | Azure Managed Redis (OSS) |
 | Stream Management(Job/Worker) | [Redis Streams](https://redis.io/docs/latest/develop/data-types/streams) | Azure Managed Redis (OSS) |
 | Real-time interaction | [Streaming](https://docs.langchain.com/oss/python/langgraph/streaming), [SSE](https://fastapi.tiangolo.com/tutorial/server-sent-events) | Azure Managed Redis (OSS) |
 | Prompt Management | [azure-storage-blob](https://github.com/Azure/azure-sdk-for-python/tree/main/sdk/storage/azure-storage-blob) | Azure Blob Storage |
-| Secret Management  | [Azure Key Vault](https://learn.microsoft.com/en-us/azure/key-vault/general) | Azure Key Vault |
+| Secret Management  | Azure Container Apps secret references | Azure Key Vault |
 | UI | [assistant-ui](https://github.com/assistant-ui/assistant-ui), [tool ui](https://www.tool-ui.com/) | Azure Static Web Apps  |
 | Authentication | [MSAL/JWT](https://learn.microsoft.com/ko-kr/entra/msal/python/) | Microsoft Entra ID, App Registration  |
-| Observability | [Langfuse](https://github.com/langfuse/langfuse) | Azure Virutal Machine or Azure Kubernetes Service, ... |
+| Observability | [Langfuse](https://github.com/langfuse/langfuse) | Azure Virtual Machine or Azure Kubernetes Service, ... |
 
 ---
 

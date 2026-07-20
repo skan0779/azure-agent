@@ -78,9 +78,28 @@ LANGFUSE-PUBLIC-KEY=
 > Add your Client IP address
 
 ### 2.3 Set secrets with the Azure CLI
+Use the bootstrap script from the repository root:
+
 ```bash
 az login
-az keyvault secret set --vault-name <key-vault-name> --name SECRET_NAME --value "SECRET_VALUE"
+scripts/bootstrap-secrets.sh --infra-dir environments/infra
+```
+
+The script requires `terraform`, `az`, and `jq`.
+
+Preview without writing to Key Vault:
+
+```bash
+scripts/bootstrap-secrets.sh --infra-dir environments/infra --dry-run
+```
+
+Manual fallback:
+
+```bash
+az keyvault secret set \
+  --vault-name <key-vault-name> \
+  --name SECRET_NAME \
+  --value "SECRET_VALUE"
 ```
 
 ---

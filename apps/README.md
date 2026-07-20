@@ -1,82 +1,64 @@
-<h1 align="center">UI</h1>
+# UI and Web Gateway
 
-<p align="center">
-  UI for azure-agent (frontend UI & backend server)
-</p>
-<br>
+This directory contains the frontend-facing services:
 
+- `azure-agent-ui`: Next.js chat UI deployed to Azure Static Web Apps.
+- `azure-agent-web`: Fastify web gateway deployed to Azure Container Apps.
 
-## Qucikstart
-> deploy `azure-agent-web`(backend) and `azure-agent-ui`(frontend) for website & mobile UI
+The recommended deployment flow is defined in the root [Quickstart](../README.md#quickstart). Terraform creates the Azure Static Web Apps resource, the `azure-agent-web` Container App, and the required Key Vault-backed secret references.
 
-### 1. Create Azure Static Web App
-> create `azure-agent-ui` azure resource
+## Web Gateway
 
-Build Details:
-- Source: Other
-- Deployment authorization policy: Deployment Token
-
-### 2. Build and Push Docker Image
-> build docker image and push image to Azure Container Registry
+Build and push the web image with the repository helper script:
 
 ```bash
-az login --use-device-code
-
-az acr login -n <your-acr-name>
-
-docker buildx build \
-  --platform linux/amd64 \
-  --provenance=false \
-  -f apps/azure-agent-web/Dockerfile \
-  -t <your-acr-name>.azurecr.io/azure-agent-web:v1 \
-  --push .
+scripts/build-push-images.sh --infra-dir environments/infra
 ```
 
-### 3. Setting Key Vault Secrets
-> add `POSTGRES-WEB-CONN-STRING` secrets
+Terraform deploys `azure-agent-web` during the second infrastructure apply:
 
-```bash
-az keyvault secret set --vault-name <your-key-vault-name> --name POSTGRES-WEB-CONN-STRING --value <your-postgres-connection-string>
+```hcl
+deploy_container_apps = true
+
+web_extra_env = {
+  AZURE_AUTH_TENANT_ID      = "<your-directory-tenant-id>"
+  AZURE_AUTH_API_CLIENT_ID  = "<your-api-app-registration-client-id>"
+  AZURE_AUTH_REQUIRED_SCOPE = "access_as_user"
+}
 ```
 
-### 4. Create Azure Container App
-> deploy `azure-agent-web` backend server (gateway server for `azure-agent-ui` and `azure-agent-api`)
+Runtime configuration is injected through Container Apps environment variables and Key Vault-backed secret references. `POSTGRES_WEB_CONN_STRING` is provided from the `POSTGRES-WEB-CONN-STRING` Key Vault secret.
 
-Network:
-- Ingress : ✅
-- Target port : 3001
+## Static Web App
 
-Security:
-- Security > Identity > System assigned: ✅
-- Azure role assignments: Key Vault Secrets User, ACR Pull
+Set this GitHub Actions secret:
 
-Application:
-- Application > Containers > Environment variables:
 ```env
-POSTGRES_WEB_CONN_STRING=secretref:postgres-web-conn-string
-AGENT_API_BASE_URL=<your-azure-agent-api-url>
-CORS_ORIGINS=https://<your-static-web-app-domain>
-AZURE_AUTH_TENANT_ID=<directory-tenant-id>
-AZURE_AUTH_API_CLIENT_ID=<azure-agent-web-api-application-client-id>
-AZURE_AUTH_REQUIRED_SCOPE=access_as_user
-HOST=0.0.0.0
-PORT=3001
+AZURE_STATIC_WEB_APPS_API_TOKEN=<azure-agent-ui-deployment-token>
 ```
 
-### 5. Setting Github Actions
-> Github Repository > Settings > Secrets and variables > Actions
+You can get the deployment token from Terraform:
 
-New repository secret:
-`AZURE_STATIC_WEB_APPS_API_TOKEN`: Azure Static Web App Deployment Token
+```bash
+terraform -chdir=environments/infra output -raw static_web_app_api_key
+```
 
-New repository variables:
-`NEXT_PUBLIC_AGENT_WEB_URL`: Azure Container App Application Url (azure-agent-web)
-`NEXT_PUBLIC_AZURE_TENANT_ID`: Directory tenant ID
-`NEXT_PUBLIC_AZURE_CLIENT_ID`: azure-agent-ui Application client ID
-`NEXT_PUBLIC_AZURE_API_SCOPE`: `api://<azure-agent-web-api-application-client-id>/access_as_user`
+Set these GitHub Actions variables:
 
-### 6. Deploy UI via Github Actions
-> deploy `azure-agent-ui` via github workflow
+```env
+NEXT_PUBLIC_AGENT_WEB_URL=<azure-agent-web-application-url>
+NEXT_PUBLIC_AZURE_TENANT_ID=<your-directory-tenant-id>
+NEXT_PUBLIC_AZURE_CLIENT_ID=<your-ui-app-registration-client-id>
+NEXT_PUBLIC_AZURE_API_SCOPE=api://<your-api-app-registration-client-id>/access_as_user
+```
+
+You can get the web URL after the runtime Terraform apply:
+
+```bash
+terraform -chdir=environments/infra output -json container_app_urls | jq -r .web
+```
+
+Deploy `azure-agent-ui` with the GitHub Actions workflow:
 
 ```bash
 git push origin main

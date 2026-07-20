@@ -1,77 +1,68 @@
-<h1 align="center">Deployment (Docker)</h1>
+# Docker Deployment
 
-<p align="center">
-  Build Docker Image and Push Image to <strong>Azure Container Registry</strong>
-</p>
+This directory contains Docker assets for the Python runtime services:
 
----
+- `azure-agent-api`
+- `azure-agent-worker`
+- `azure-agent-job`
 
-## 1. Azure Login
-> Create and login to Azure resources
+The web service uses its own Dockerfile:
+
+- [`../../apps/azure-agent-web/Dockerfile`](../../apps/azure-agent-web/Dockerfile)
+
+## Recommended Flow
+
+Build and push images from the repository root:
+
 ```bash
-# Azure Login and Select Subscription
-az login
-
-# Azure Container Registry Login
-az acr login -n <acr-name>
+scripts/build-push-images.sh --infra-dir environments/infra
 ```
 
----
+The script reads `acr_login_server` from Terraform output, logs in to ACR, and pushes:
 
-## 2. Build Image
-> Build docker image with Docker Desktop
-```bash
-# Build Image
-docker buildx build --platform linux/amd64 \
-  -f environments/deploy/Dockerfile \
-  -t azure-agent:local \
-  --load .
-```
-
----
-
-## 3. Push Image to ACR
-> Push Docker Image to Azure Container Registry
-```bash
-# Tag
-docker tag azure-agent:local <acr-name>.azurecr.io/azure-agent:v1.x
-
-# Push
-docker push <acr-name>.azurecr.io/azure-agent:v1.x
-```
-
----
-
-## 4. Create Azure Container Apps
-> Create separate Azure Container App resources for `API` and `Worker`. (Both resources use the same container image tag)
-
-- `api` handles HTTP traffic.
-- `worker` consumes Redis jobs and should not be exposed through ingress.
-
-Recommended layout:
 ```text
-ACA #1: azure-agent-api
-- Image: <acr-name>.azurecr.io/azure-agent:v1.x
-- Ingress: enabled
-- Target port: 8080
-- Command override: not required
-
-ACA #2: azure-agent-worker
-- Image: <acr-name>.azurecr.io/azure-agent:v1.x
-- Ingress: disabled
-- Command override: required
+<acr-login-server>/azure-agent:local
+<acr-login-server>/azure-agent-web:local
 ```
 
----
+Preview without running Docker:
 
-## 5. Setting Azure Container Apps (Command Override)
-> The `Worker` Container App must override the default container command. (Application > Containers > Properties > Command override) Image default command starts the `API` server.
-
-Worker override values:
-```text
-Command override:
-sh
-
-Arguments override:
--lc, uv run azure-agent-worker
+```bash
+scripts/build-push-images.sh --infra-dir environments/infra --dry-run
 ```
+
+For all script options, see [`../../scripts/README.md`](../../scripts/README.md).
+
+## Image Tags
+
+Keep image tags aligned with `environments/infra/terraform.tfvars`:
+
+```hcl
+api_worker_image_tag = "azure-agent:local"
+web_image_tag        = "azure-agent-web:local"
+```
+
+Terraform adds the ACR login server when it creates Container Apps.
+
+## Runtime Commands
+
+The same Python image is used by `api`, `worker`, and `job`.
+
+| Unit | Command |
+| --- | --- |
+| `azure-agent-api` | Dockerfile default `CMD` |
+| `azure-agent-worker` | `sh -lc "uv run azure-agent-worker"` |
+| `azure-agent-job` | `sh -lc "uv run --no-sync alembic upgrade head"` |
+
+Container Apps and the Container App Job are created by Terraform after images and Key Vault secrets are ready:
+
+```hcl
+deploy_container_apps    = true
+deploy_container_app_job = true
+```
+
+## Local Compose
+
+[`docker-compose.yml`](./docker-compose.yml) is for local development only. It reads `../env/.env.dev` and starts a local Redis container.
+
+The Azure deployment path does not use this Compose file. Azure runtime configuration is injected through Container Apps environment variables and Key Vault-backed secret references.

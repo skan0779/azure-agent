@@ -1,16 +1,11 @@
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
-
-from dotenv import load_dotenv
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
 
-# Load ENV
-ENV_PATH = Path(__file__).resolve().parents[2] / "environments/env/.env"
-load_dotenv(dotenv_path=ENV_PATH)
+from config import load_config
 
 # Load Data
 DATA_PATH = Path(__file__).with_name("index_documents.jsonl")
@@ -24,15 +19,17 @@ def _iter_batches(items: List[Dict[str, Any]], batch_size: int) -> Iterable[List
     for i in range(0, len(items), batch_size):
         yield items[i : i + batch_size]
 
+
 # Main Function
 def main() -> None:
+    config = load_config()
 
     # Load Search Client
     search_client = SearchClient(
-        endpoint=os.environ.get("AZURE-AI-SEARCH-ENDPOINT"),
-        index_name=os.environ.get("AZURE-AI-SEARCH-INDEX-NAME"),
-        credential=AzureKeyCredential(os.environ.get("AZURE-AI-SEARCH-API-KEY")),
-        api_version=os.environ.get("AZURE-AI-SEARCH-API-VERSION", "2023-11-01"),
+        endpoint=config.endpoint,
+        index_name=config.index_name,
+        credential=AzureKeyCredential(config.api_key),
+        api_version=config.api_version,
     )
 
     # Load JSONL

@@ -1,16 +1,15 @@
 # Azure Agent Infrastructure
 
-Terraform template for a public-first Azure Agent deployment.
+Terraform template for the core Azure Agent infrastructure.
 
-This template intentionally starts without VNet, private endpoints, private DNS, or VM jump hosts. The first goal is a low-friction deployment path for development, demos, and template validation. Production deployments should add private networking and stricter firewall rules.
+This stack is intentionally public-first for demos, development, and template validation. Production deployments should add private networking, stricter firewall rules, managed backups, monitoring, and policy controls.
 
 ## Scope
 
-The current implementation creates:
+This Terraform stack creates:
 
 - Resource Group
 - Log Analytics Workspace
-- Shared naming convention for the remaining Azure Agent resources
 - Azure Container Registry
 - Key Vault
 - Storage Account
@@ -30,6 +29,130 @@ The current implementation creates:
 - Container Apps Session Pools for Python and Bash
 - Static Web Apps
 - Managed identity role assignments
+
+The optional demo Langfuse VM is managed by a separate Terraform stack:
+
+- [`../langfuse-vm`](../langfuse-vm)
+
+## Deployment Flow
+
+Use two Terraform applies:
+
+1. First apply creates shared Azure resources only.
+2. Scripts configure secrets, search data, prompt files, and images.
+3. Second apply creates Container Apps and the migration job.
+
+This avoids first-apply failures before ACR images and Key Vault secret values exist.
+
+## 1. First Apply
+
+```bash
+cd environments/infra
+cp terraform.tfvars.example terraform.tfvars
+terraform init
+terraform plan
+terraform apply
+```
+
+Keep runtime services disabled for the first apply:
+
+```hcl
+deploy_container_apps    = false
+deploy_container_app_job = false
+```
+
+Optionally create Azure OpenAI deployments if your subscription, region, and quota support the configured models:
+
+```hcl
+create_openai_deployments = true
+```
+
+Model deployment names default to:
+
+- `gpt-5.4`
+- `gpt-5.4-nano`
+- `text-embedding-3-large`
+
+## 2. Configure Runtime Dependencies
+
+Run helper scripts from the repository root.
+
+Set Key Vault application secrets:
+
+```bash
+scripts/bootstrap-secrets.sh --infra-dir environments/infra
+```
+
+Create the Azure AI Search index and upload sample documents:
+
+```bash
+scripts/setup-azure-ai-search.sh --infra-dir environments/infra
+```
+
+Upload prompt files to Blob Storage:
+
+```bash
+scripts/upload-prompts.sh --infra-dir environments/infra
+```
+
+Build and push Container App images to ACR:
+
+```bash
+scripts/build-push-images.sh --infra-dir environments/infra
+```
+
+For script options and dry-run examples, see [`../../scripts/README.md`](../../scripts/README.md).
+
+## 3. Second Apply
+
+After secrets and images are ready, update `terraform.tfvars`:
+
+```hcl
+deploy_container_apps    = true
+deploy_container_app_job = true
+
+worker_extra_env = {
+  LANGFUSE_BASE_URL = "<terraform-output-langfuse-url>"
+}
+
+web_extra_env = {
+  AZURE_AUTH_TENANT_ID      = "<your-directory-tenant-id>"
+  AZURE_AUTH_API_CLIENT_ID  = "<your-api-app-registration-client-id>"
+  AZURE_AUTH_REQUIRED_SCOPE = "access_as_user"
+}
+```
+
+Then apply again:
+
+```bash
+terraform plan
+terraform apply
+```
+
+Expected image tags:
+
+```hcl
+api_worker_image_tag = "azure-agent:local"
+web_image_tag        = "azure-agent-web:local"
+```
+
+The ACR login server is added by Terraform when it creates the Container Apps.
+
+## Key Vault and Secret References
+
+Terraform creates the Key Vault and Container App secret references, but it does not write application secret values. This avoids storing secret values in Terraform state.
+
+Secret naming follows this convention:
+
+- Key Vault secret name: `AZURE-OPENAI-API-KEY`
+- Container App secret key: `azure-openai-api-key`
+- Runtime environment variable: `AZURE_OPENAI_API_KEY`
+
+The expected Key Vault secret names are defined in [`../env/.env.keyvault`](../env/.env.keyvault) and exposed by the `key_vault_secret_names` output.
+
+If `assign_current_user_key_vault_secrets_officer` is `true`, Terraform grants the current Azure principal permission to manage Key Vault secrets.
+
+Some managed resources expose credentials to Terraform state. Protect the state file and prefer a remote backend for shared environments.
 
 ## Network Model
 
@@ -51,125 +174,34 @@ postgres_allow_public_access_from_all_ips = true
 
 Disable this for restricted deployments and set `postgres_firewall_rules` explicitly.
 
-## Key Vault
-
-The application secret names are defined in [`../env/.env.keyvault`](../env/.env.keyvault). This Terraform template exposes the expected names as `key_vault_secret_names`.
-
-Terraform creates the Key Vault resource, but does not write application secrets. This avoids storing secret values in Terraform state.
-
-After `terraform apply`, set values manually. For example:
+## Useful Outputs
 
 ```bash
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name BLOB-CONNECTION-STRING \
-  --value "<storage-account-connection-string>"
-
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name AZURE-OPENAI-ENDPOINT \
-  --value "<openai-endpoint>"
-
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name AZURE-AI-SEARCH-ENDPOINT \
-  --value "<search-endpoint>"
-
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name POSTGRES-CONN-STRING \
-  --value "postgresql://<user>:<password>@<postgres-fqdn>:5432/azure_agent?sslmode=require"
-
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name POSTGRES-WEB-CONN-STRING \
-  --value "postgresql://<user>:<password>@<postgres-fqdn>:5432/azure_agent_web?sslmode=require"
+terraform output
 ```
 
-If `assign_current_user_key_vault_secrets_officer` is `true`, Terraform grants the current Azure principal permission to manage Key Vault secrets.
+Commonly used outputs:
 
-Terraform does not write secrets to Key Vault, but some managed resources expose credentials to Terraform state. Protect the state file and prefer a remote backend for shared environments.
-
-Set the session pool endpoints from Terraform outputs:
-
-```bash
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name AZURE-DYNAMIC-SESSIONS-PYTHON-POOL-ENDPOINT \
-  --value "<python-session-pool-endpoint>"
-
-az keyvault secret set \
-  --vault-name "<key-vault-name>" \
-  --name AZURE-DYNAMIC-SESSIONS-BASH-POOL-ENDPOINT \
-  --value "<bash-session-pool-endpoint>"
-```
-
-## Azure OpenAI Deployments
-
-Model deployments are disabled by default because model availability and quota vary by subscription and region.
-
-To create deployments, set:
-
-```hcl
-create_openai_deployments = true
-```
-
-Default deployment names:
-
-- `gpt-5.4`
-- `gpt-5.4-nano`
-- `text-embedding-3-large`
-
-Use the deployment names as these Key Vault secret values:
-
-- `AZURE-OPENAI-MAIN-MODEL`
-- `AZURE-OPENAI-SMALL-MODEL`
-- `AZURE-OPENAI-EMBEDDING-MODEL`
-
-## Container Apps
-
-Container Apps are disabled by default:
-
-```hcl
-deploy_container_apps = false
-```
-
-This avoids a first `terraform apply` failure before container images exist in ACR. Recommended flow:
-
-1. Run `terraform apply` with `deploy_container_apps = false`.
-2. Push images to the output `acr_login_server`.
-3. Set `deploy_container_apps = true`.
-4. Run `terraform apply` again.
-
-Expected image tags:
-
-```hcl
-api_worker_image_tag = "azure-agent:local"
-web_image_tag        = "azure-agent-web:local"
-```
-
-The API and web apps have external ingress. The worker has no ingress.
-
-Static Web Apps is created by Terraform, but the UI still needs a separate build/deploy pipeline. Use `static_web_app_api_key` as the GitHub Actions secret `AZURE_STATIC_WEB_APPS_API_TOKEN` and set `NEXT_PUBLIC_AGENT_WEB_URL` to the `web` Container App URL.
-
-## Quickstart
-
-```bash
-cd environments/infra
-cp terraform.tfvars.example terraform.tfvars
-terraform init
-terraform plan
-```
-
-Apply only after reviewing the plan:
-
-```bash
-terraform apply
-```
+- `resource_group_name`
+- `acr_login_server`
+- `key_vault_uri`
+- `storage_account_name`
+- `search_endpoint`
+- `openai_endpoint`
+- `content_safety_endpoint`
+- `redis_memory`
+- `redis_stream`
+- `postgres_connection_string_templates`
+- `session_pool_endpoints`
+- `container_app_urls`
+- `static_web_app_url`
+- `static_web_app_api_key`
+- `key_vault_secret_names`
+- `resource_names`
 
 ## Naming
 
-Most resources use the `azure-agent-*` pattern:
+Most resources use the `azure-agent-dev-<suffix>-*` pattern:
 
 ```text
 azure-agent-dev-<suffix>-api

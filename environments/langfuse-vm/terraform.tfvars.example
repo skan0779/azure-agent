@@ -1,0 +1,30 @@
+# Azure Agent Langfuse VM Terraform template
+
+# Leave null to use ARM_SUBSCRIPTION_ID or the active Azure CLI subscription.
+subscription_id = null
+
+# Use the resource_group_name output from environments/infra.
+resource_group_name = "<core-resource-group-name>"
+
+project_name = "azure-agent"
+environment  = "dev"
+
+# Optional. Set this to the same suffix used by the core stack if you want aligned names.
+name_suffix = ""
+
+tags = {
+  Owner = "your-name@example.com"
+}
+
+admin_username     = "azureuser"
+ssh_public_key     = null
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Restrict SSH and Langfuse UI/API access to trusted client IPs.
+allowed_source_ip_ranges = ["<your-client-ip>/32"]
+
+vm_size         = "Standard_D4s_v5"
+os_disk_size_gb = 64
+
+vnet_address_space      = ["10.70.0.0/16"]
+subnet_address_prefixes = ["10.70.1.0/24"]
