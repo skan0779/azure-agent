@@ -1,7 +1,7 @@
 <h1 align="center">Azure Agent</h1>
 
 <p align="center">
-  Enterprise-Grade AI Chat Agent Template on Azure
+  Enterprise-Grade Deep Agent Template on Microsoft Azure
 </p>
 
 <p align="center">
