@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-2563EB.svg" alt="License"></a>
+  <img src="https://img.shields.io/badge/Powered_by-Azure-0078D4?style=flat&logo=microsoft-azure&logoColor=white" alt="Azure">
   <img src="https://img.shields.io/badge/Docker-2563EB?logo=docker&logoColor=white" alt="Docker">
 </p>
 
